@@ -1,2 +1,2 @@
-// React context providers placeholder
-export {};
+export { AuthProvider, useAuth } from './AuthContext';
+
