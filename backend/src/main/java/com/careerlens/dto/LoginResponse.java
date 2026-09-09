@@ -10,20 +10,26 @@ public class LoginResponse {
     private String email;
     private Role role;
     private String message;
+    private String token;
 
     public LoginResponse() {
     }
 
     public LoginResponse(Long id, String fullName, String email, Role role) {
-        this(id, fullName, email, role, "Login successful");
+        this(id, fullName, email, role, "Login successful", null);
     }
 
     public LoginResponse(Long id, String fullName, String email, Role role, String message) {
+        this(id, fullName, email, role, message, null);
+    }
+
+    public LoginResponse(Long id, String fullName, String email, Role role, String message, String token) {
         this.id = id;
         this.fullName = fullName;
         this.email = email;
         this.role = role;
         this.message = message;
+        this.token = token;
     }
 
     public static LoginResponse fromEntity(User user) {
@@ -31,6 +37,10 @@ public class LoginResponse {
     }
 
     public static LoginResponse fromEntity(User user, String message) {
+        return fromEntity(user, message, null);
+    }
+
+    public static LoginResponse fromEntity(User user, String message, String token) {
         if (user == null) {
             return null;
         }
@@ -39,7 +49,8 @@ public class LoginResponse {
                 user.getFullName(),
                 user.getEmail(),
                 user.getRole(),
-                message
+                message,
+                token
         );
     }
 
@@ -81,6 +92,14 @@ public class LoginResponse {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 }
 

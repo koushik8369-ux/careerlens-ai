@@ -10,6 +10,7 @@ import com.careerlens.exception.EmailAlreadyExistsException;
 import com.careerlens.exception.InvalidCredentialsException;
 import com.careerlens.exception.PasswordMismatchException;
 import com.careerlens.repository.UserRepository;
+import com.careerlens.security.JwtService;
 import com.careerlens.service.UserService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,15 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     @Override
@@ -74,6 +80,15 @@ public class UserServiceImpl implements UserService {
         }
 
         // 4. Return safe LoginResponse with user details and success message
-        return LoginResponse.fromEntity(user, "Login successful");
+        String token = jwtService.generateToken(user.getEmail(), user.getRole().name());
+        return LoginResponse.fromEntity(user, "Login successful", token);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getByEmail(String email) {
+        return userRepository.findByEmail(email.trim().toLowerCase())
+                .map(UserResponse::fromEntity)
+                .orElseThrow(() -> new InvalidCredentialsException("User not found"));
     }
 }

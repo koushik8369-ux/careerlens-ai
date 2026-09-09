@@ -26,6 +26,7 @@ export interface LoginResponse {
   email: string;
   role: 'USER' | 'ADMIN';
   message: string;
+  token: string;
 }
 
 export interface User {
@@ -42,6 +43,11 @@ export interface UserResponse extends User {
 
 /** Runtime authenticated user stored in AuthContext / localStorage. */
 export type AuthUser = User;
+
+export interface AuthSession {
+  user: AuthUser;
+  token: string;
+}
 
 /** Unified auth response type — mirrors LoginResponse from the backend. */
 export type AuthResponse = LoginResponse;

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../services/authService';
 import type { LoginRequest } from '../types';
 
 export const LoginPage: React.FC = () => {
@@ -32,15 +33,7 @@ export const LoginPage: React.FC = () => {
       await login(form);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const axiosError = err as {
-        response?: { data?: { message?: string } };
-        message?: string;
-      };
-      setError(
-        axiosError?.response?.data?.message ||
-          axiosError?.message ||
-          'Login failed. Please check your credentials.',
-      );
+      setError(getAuthErrorMessage(err, 'Login failed. Please check your credentials.'));
     } finally {
       setIsLoading(false);
     }
