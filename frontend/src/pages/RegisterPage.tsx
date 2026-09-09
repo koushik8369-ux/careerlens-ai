@@ -12,6 +12,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getAuthErrorMessage } from '../services/authService';
 import type { RegisterRequest } from '../types';
 
 interface FormState extends RegisterRequest {
@@ -81,15 +82,7 @@ export const RegisterPage: React.FC = () => {
       setSuccess(true);
       setTimeout(() => navigate('/login'), 1800);
     } catch (err: unknown) {
-      const axiosError = err as {
-        response?: { data?: { message?: string } };
-        message?: string;
-      };
-      setServerError(
-        axiosError?.response?.data?.message ||
-          axiosError?.message ||
-          'Registration failed. Please try again.',
-      );
+      setServerError(getAuthErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setIsLoading(false);
     }

@@ -32,7 +32,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const STORAGE_KEY = 'careerlens_user';
+const STORAGE_KEY = 'careerlens_session';
 
 // ─── Provider ────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        setUser(JSON.parse(raw) as AuthUser);
+        const session = JSON.parse(raw) as { user?: AuthUser; token?: string };
+        if (session.user && session.token) {
+          setUser(session.user);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
@@ -65,12 +70,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
       role: response.role,
     };
     setUser(authUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(authUser));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: authUser, token: response.token }));
   };
 
   const logout = (): void => {
     setUser(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('careerlens_user');
   };
 
   const register = async (data: RegisterRequest): Promise<UserResponse> => {

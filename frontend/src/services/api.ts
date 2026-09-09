@@ -9,6 +9,21 @@ const api = axios.create({
   timeout: 10000,
 });
 
+api.interceptors.request.use((config) => {
+  const session = localStorage.getItem('careerlens_session');
+  if (session) {
+    try {
+      const { token } = JSON.parse(session) as { token?: string };
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      localStorage.removeItem('careerlens_session');
+    }
+  }
+  return config;
+});
+
 export const checkHealth = async (): Promise<HealthStatusResponse> => {
   const response = await api.get<HealthStatusResponse>('/health');
   return response.data;

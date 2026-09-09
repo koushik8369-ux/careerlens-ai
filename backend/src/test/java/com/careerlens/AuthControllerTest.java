@@ -4,6 +4,7 @@ import com.careerlens.dto.LoginRequest;
 import com.careerlens.dto.RegisterRequest;
 import com.careerlens.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -168,6 +170,40 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.email", is("login@example.com")))
                 .andExpect(jsonPath("$.role", is("USER")))
                 .andExpect(jsonPath("$.message", is("Login successful")))
+                .andExpect(jsonPath("$.token", notNullValue()))
+                .andExpect(jsonPath("$.password").doesNotExist());
+    }
+
+    @Test
+    void protectedCurrentUser_RequiresValidJwt() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized());
+
+        RegisterRequest registerRequest = new RegisterRequest(
+                "Protected User",
+                "protected@example.com",
+                "secret123",
+                "secret123"
+        );
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(registerRequest)))
+                .andExpect(status().isCreated());
+
+        String loginResponse = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        new LoginRequest("protected@example.com", "secret123"))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String token = JsonPath.read(loginResponse, "$.token");
+
+        mockMvc.perform(get("/api/auth/me")
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email", is("protected@example.com")))
                 .andExpect(jsonPath("$.password").doesNotExist());
     }
 

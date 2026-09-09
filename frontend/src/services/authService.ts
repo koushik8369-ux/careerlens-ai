@@ -1,4 +1,5 @@
 import api from './api';
+import axios from 'axios';
 import type {
   LoginRequest,
   LoginResponse,
@@ -30,4 +31,14 @@ export const loginUser = async (
 ): Promise<LoginResponse> => {
   const response = await api.post<LoginResponse>('/auth/login', data);
   return response.data;
+};
+
+export const getAuthErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    if (!error.response) {
+      return 'Unable to reach CareerLens. Please check that the backend is running.';
+    }
+    return error.response.data?.message || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
 };

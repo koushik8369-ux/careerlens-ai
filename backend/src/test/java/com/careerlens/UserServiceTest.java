@@ -10,6 +10,7 @@ import com.careerlens.exception.EmailAlreadyExistsException;
 import com.careerlens.exception.InvalidCredentialsException;
 import com.careerlens.exception.PasswordMismatchException;
 import com.careerlens.repository.UserRepository;
+import com.careerlens.security.JwtService;
 import com.careerlens.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,9 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtService jwtService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -121,6 +125,7 @@ class UserServiceTest {
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(existingUser));
         when(passwordEncoder.matches("password123", "$2a$10$hashedPasswordSample")).thenReturn(true);
+        when(jwtService.generateToken("test@example.com", "USER")).thenReturn("test-token");
 
         LoginResponse response = userService.login(validLoginRequest);
 
@@ -130,6 +135,7 @@ class UserServiceTest {
         assertEquals("test@example.com", response.getEmail());
         assertEquals(Role.USER, response.getRole());
         assertEquals("Login successful", response.getMessage());
+        assertEquals("test-token", response.getToken());
 
         verify(userRepository, times(1)).findByEmail("test@example.com");
         verify(passwordEncoder, times(1)).matches("password123", "$2a$10$hashedPasswordSample");
