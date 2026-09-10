@@ -12,6 +12,7 @@ import type {
   UserResponse,
 } from '../types';
 import { loginUser, registerUser } from '../services/authService';
+import { AUTH_SESSION_INVALIDATED_EVENT } from '../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const handleInvalidSession = () => {
+      setUser(null);
+      localStorage.removeItem(STORAGE_KEY);
+    };
+
+    window.addEventListener(AUTH_SESSION_INVALIDATED_EVENT, handleInvalidSession);
+    return () => window.removeEventListener(AUTH_SESSION_INVALIDATED_EVENT, handleInvalidSession);
   }, []);
 
   const login = async (data: LoginRequest): Promise<void> => {

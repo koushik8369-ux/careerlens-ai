@@ -49,5 +49,35 @@ export interface AuthSession {
   token: string;
 }
 
+export interface UserProfileRequest {
+  phone: string | null;
+  education: string | null;
+  college: string | null;
+  graduationYear: number | null;
+  careerGoal: string | null;
+  bio: string | null;
+  location: string | null;
+  skills: string[];
+}
+
+export interface UserProfileResponse extends UserProfileRequest {
+  userId: number;
+  fullName: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DashboardResponse {
+  userId: number;
+  fullName: string;
+  email: string;
+  careerGoal: string | null;
+  education: string | null;
+  profileCompletionPercentage: number;
+  skillCount: number;
+  profileStatus: 'COMPLETE' | 'IN_PROGRESS' | 'NOT_STARTED' | string;
+}
+
 /** Unified auth response type — mirrors LoginResponse from the backend. */
 export type AuthResponse = LoginResponse;

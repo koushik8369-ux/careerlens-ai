@@ -10,6 +10,7 @@ export const AppLayout: React.FC = () => {
   const navLinks = [
     { to: '/', label: 'Home', icon: Home },
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/profile', label: 'Profile', icon: UserCircle2 },
     { to: '/about', label: 'About', icon: Info },
   ];
 
