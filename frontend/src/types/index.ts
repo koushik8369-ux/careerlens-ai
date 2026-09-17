@@ -81,3 +81,69 @@ export interface DashboardResponse {
 
 /** Unified auth response type — mirrors LoginResponse from the backend. */
 export type AuthResponse = LoginResponse;
+
+export interface ResumeAnalysisResponse {
+  id: number;
+  fileName: string;
+  fileType: string;
+  overallScore: number;
+  targetRole?: string;
+  matchScore?: number;
+  detectedSkills: string[];
+  detectedEducation: string[];
+  detectedExperience: string[];
+  detectedProjects: string[];
+  missingSections: string[];
+  improvementSuggestions: string[];
+  createdAt: string;
+}
+
+// ── Phase 4: Job & Career Intelligence ─────────────────────────────────────
+
+export interface JobAnalysisRequest {
+  jobTitle?: string;
+  companyName?: string;
+  jobDescription: string;
+}
+
+export type SkillPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface SkillGap {
+  skill: string;
+  priority: SkillPriority;
+  explanation: string;
+}
+
+export type RecommendationCategory = 'LEARNING' | 'PROJECT' | 'PREPARATION';
+
+export interface CareerRecommendation {
+  category: RecommendationCategory;
+  title: string;
+  description: string;
+}
+
+export type QuestionCategory = 'TECHNICAL' | 'BEHAVIORAL' | 'PROJECT';
+
+export interface InterviewQuestion {
+  question: string;
+  category: QuestionCategory;
+  rationale: string;
+}
+
+export interface JobAnalysisResponse {
+  id: number;
+  jobTitle: string;
+  companyName: string;
+  rawJobDescription: string;
+  overallMatchScore: number;
+  requiredSkillMatchPercent: number;
+  preferredSkillMatchPercent: number;
+  requiredSkills: string[];
+  preferredSkills: string[];
+  matchedSkills: string[];
+  missingSkills: string[];
+  skillGaps: SkillGap[];
+  recommendations: CareerRecommendation[];
+  interviewQuestions: InterviewQuestion[];
+  createdAt: string;
+}
