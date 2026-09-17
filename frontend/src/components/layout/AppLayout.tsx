@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Sparkles, Home, LayoutDashboard, Info, LogIn, LogOut, UserCircle2 } from 'lucide-react';
+import { Sparkles, Home, LayoutDashboard, Info, LogIn, LogOut, UserCircle2, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const AppLayout: React.FC = () => {
@@ -10,6 +10,7 @@ export const AppLayout: React.FC = () => {
   const navLinks = [
     { to: '/', label: 'Home', icon: Home },
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/resume-analyzer', label: 'Resume Analyzer', icon: FileText },
     { to: '/profile', label: 'Profile', icon: UserCircle2 },
     { to: '/about', label: 'About', icon: Info },
   ];

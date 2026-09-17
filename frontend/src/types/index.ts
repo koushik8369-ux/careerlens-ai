@@ -81,3 +81,19 @@ export interface DashboardResponse {
 
 /** Unified auth response type — mirrors LoginResponse from the backend. */
 export type AuthResponse = LoginResponse;
+
+export interface ResumeAnalysisResponse {
+  id: number;
+  fileName: string;
+  fileType: string;
+  overallScore: number;
+  targetRole?: string;
+  matchScore?: number;
+  detectedSkills: string[];
+  detectedEducation: string[];
+  detectedExperience: string[];
+  detectedProjects: string[];
+  missingSections: string[];
+  improvementSuggestions: string[];
+  createdAt: string;
+}
