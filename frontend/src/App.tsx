@@ -11,6 +11,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ResumeAnalyzerPage } from './pages/ResumeAnalyzerPage';
+import { JobIntelligencePage } from './pages/JobIntelligencePage';
 
 export const App: React.FC = () => {
   return (
@@ -37,6 +38,14 @@ export const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <ResumeAnalyzerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="job-intelligence"
+              element={
+                <ProtectedRoute>
+                  <JobIntelligencePage />
                 </ProtectedRoute>
               }
             />
