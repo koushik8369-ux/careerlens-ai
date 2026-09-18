@@ -5,6 +5,8 @@ import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
+import com.careerlens.ai.provider.contracts.ProjectRecommendation;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import org.springframework.stereotype.Component;
 
@@ -157,6 +159,35 @@ public class DeterministicCareerAiProvider implements CareerAiProvider {
                 new CareerRoadmapStage("SHORT_TERM", "Establish the foundations for " + goal + ".", distinct(shortTermActions), distinct(shortTermSkills)),
                 new CareerRoadmapStage("MEDIUM_TERM", "Create evidence of applied ability for " + goal + ".", distinct(mediumTermActions), distinct(mediumTermSkills)),
                 new CareerRoadmapStage("LONG_TERM", "Sustain progress toward " + goal + ".", distinct(longTermActions), distinct(longTermSkills))));
+    }
+
+    @Override
+    public ProjectRecommendationResult recommendProjects(UserCareerContext context) {
+        UserCareerContext safeContext = context == null ? emptyContext() : context;
+        Set<String> existingSkills = normalizedSkillSet(safeContext);
+        List<String> gaps = filteredMissingSkills(safeContext.getLatestJobRequiredSkills(), existingSkills);
+        gaps = mergeDistinct(gaps, filteredMissingSkills(safeContext.getLatestJobPreferredSkills(), existingSkills));
+        if (gaps.isEmpty()) {
+            gaps = filteredMissingSkills(safeContext.getLatestJobMissingSkills(), existingSkills);
+        }
+
+        List<ProjectRecommendation> recommendations = new ArrayList<>();
+        for (String skill : gaps.stream().limit(3).toList()) {
+            recommendations.add(new ProjectRecommendation(
+                    projectFor(skill),
+                    "Create a focused, truthful project with documented decisions, implementation details, and measurable outcomes.",
+                    List.of(skill),
+                    "This project addresses an unaddressed skill in the available job context."));
+        }
+        if (recommendations.isEmpty()) {
+            String goal = safeContext.getCareerGoal() == null ? "your target career direction" : safeContext.getCareerGoal();
+            recommendations.add(new ProjectRecommendation(
+                    "Build a portfolio project aligned with " + goal + ".",
+                    "Choose a small problem, implement it end to end, and document the problem, your contribution, technologies, and truthful outcome.",
+                    mergedSkills(safeContext),
+                    "No unaddressed job skills are available, so the recommendation establishes evidence for your career direction."));
+        }
+        return new ProjectRecommendationResult(recommendations);
     }
 
     private CareerAssistantAnswer answerCareerGoal(UserCareerContext context) {

@@ -4,6 +4,7 @@ import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageRequest;
 import com.careerlens.dto.CareerAssistantMessageResponse;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.service.CareerAssistantService;
 import jakarta.validation.Valid;
@@ -53,5 +54,10 @@ public class CareerAssistantController {
     @PostMapping("/roadmap")
     public ResponseEntity<CareerRoadmapResult> generateRoadmap() {
         return ResponseEntity.ok(careerAssistantService.generateRoadmap());
+    }
+
+    @PostMapping("/projects")
+    public ResponseEntity<ProjectRecommendationResult> recommendProjects() {
+        return ResponseEntity.ok(careerAssistantService.recommendProjects());
     }
 }

@@ -5,6 +5,8 @@ import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
+import com.careerlens.ai.provider.contracts.ProjectRecommendation;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.entity.CareerAssistantConversation;
 import com.careerlens.entity.CareerAssistantMessage;
@@ -169,5 +171,31 @@ class CareerAssistantServiceTest {
 
                 verify(careerContextService, never()).buildForCurrentUser();
                 verify(careerAiProvider, never()).generateCareerRoadmap(any());
+        }
+
+        @Test
+        void recommendsProjectsUsingAuthenticatedUserContext() {
+                UserCareerContext context = new UserCareerContext(
+                                "Backend Engineer", List.of("Java"), null, null, null, null, List.of(), List.of(), List.of(), List.of(),
+                                List.of(), List.of(), null, null, null, List.of("Docker"), List.of(), List.of(), List.of("Docker"), List.of());
+                ProjectRecommendationResult result = new ProjectRecommendationResult(List.of(
+                                new ProjectRecommendation("Build a Docker project", "Document the implementation.", List.of("Docker"), "Closes a skill gap.")));
+                when(careerContextService.buildForCurrentUser()).thenReturn(context);
+                when(careerAiProvider.recommendProjects(context)).thenReturn(result);
+
+                assertEquals(result, service.recommendProjects());
+
+                verify(careerContextService).buildForCurrentUser();
+                verify(careerAiProvider).recommendProjects(context);
+        }
+
+        @Test
+        void rejectsProjectRecommendationsWithoutAuthentication() {
+                SecurityContextHolder.clearContext();
+
+                assertThrows(RuntimeException.class, () -> service.recommendProjects());
+
+                verify(careerContextService, never()).buildForCurrentUser();
+                verify(careerAiProvider, never()).recommendProjects(any());
         }
 }

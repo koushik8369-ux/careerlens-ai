@@ -3,6 +3,7 @@ package com.careerlens.service.impl;
 import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageResponse;
@@ -115,6 +116,13 @@ public class CareerAssistantServiceImpl implements CareerAssistantService {
     public CareerRoadmapResult generateRoadmap() {
         getAuthenticatedUser();
         return careerAiProvider.generateCareerRoadmap(careerContextService.buildForCurrentUser());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProjectRecommendationResult recommendProjects() {
+        getAuthenticatedUser();
+        return careerAiProvider.recommendProjects(careerContextService.buildForCurrentUser());
     }
 
     private User getAuthenticatedUser() {

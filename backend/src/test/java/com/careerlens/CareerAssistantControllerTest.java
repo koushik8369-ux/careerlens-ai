@@ -68,6 +68,25 @@ class CareerAssistantControllerTest {
                                 .andExpect(jsonPath("$.stages[2].name").value("LONG_TERM"));
         }
 
+        @Test
+        void projectRecommendationsRequireAuthentication() throws Exception {
+                mockMvc.perform(post("/api/career-assistant/projects"))
+                                .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void authenticatedUserCanRequestProjectRecommendationsWithMinimalContext() throws Exception {
+                String email = "projects-" + UUID.randomUUID() + "@example.com";
+                String token = registerAndLogin(email);
+
+                mockMvc.perform(post("/api/career-assistant/projects")
+                                                .header("Authorization", "Bearer " + token))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.recommendations", hasSize(1)))
+                                .andExpect(jsonPath("$.recommendations[0].title").isNotEmpty())
+                                .andExpect(jsonPath("$.recommendations[0].skills").isArray());
+        }
+
     private String registerAndLogin(String email) throws Exception {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)

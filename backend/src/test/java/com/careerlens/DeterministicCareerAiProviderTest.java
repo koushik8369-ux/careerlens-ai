@@ -5,6 +5,7 @@ import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.DeterministicCareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -145,6 +146,15 @@ class DeterministicCareerAiProviderTest {
         assertNotNull(result);
         assertFalse(result.weakAreas().isEmpty());
         assertFalse(result.missingContent().isEmpty());
+    }
+
+    @Test
+    void emptyContextReturnsSafeProjectRecommendation() {
+        ProjectRecommendationResult result = provider.recommendProjects(null);
+
+        assertNotNull(result);
+        assertEquals(1, result.recommendations().size());
+        assertFalse(result.recommendations().get(0).title().isBlank());
     }
 
     @Test
