@@ -12,6 +12,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ResumeAnalyzerPage } from './pages/ResumeAnalyzerPage';
 import { JobIntelligencePage } from './pages/JobIntelligencePage';
+import { CareerAssistantPage } from './pages/CareerAssistantPage';
+import { CareerPlanPage } from './pages/CareerPlanPage';
 
 export const App: React.FC = () => {
   return (
@@ -56,6 +58,14 @@ export const App: React.FC = () => {
                   <ProfilePage />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="career-assistant"
+              element={<ProtectedRoute><CareerAssistantPage /></ProtectedRoute>}
+            />
+            <Route
+              path="career-plan"
+              element={<ProtectedRoute><CareerPlanPage /></ProtectedRoute>}
             />
             <Route path="about" element={<AboutPage />} />
             <Route path="*" element={<NotFoundPage />} />
