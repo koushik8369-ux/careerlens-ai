@@ -2,6 +2,7 @@ package com.careerlens.service.impl;
 
 import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageResponse;
@@ -107,6 +108,13 @@ public class CareerAssistantServiceImpl implements CareerAssistantService {
     public ResumeImprovementResult improveResume() {
         getAuthenticatedUser();
         return careerAiProvider.improveResume(careerContextService.buildForCurrentUser());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CareerRoadmapResult generateRoadmap() {
+        getAuthenticatedUser();
+        return careerAiProvider.generateCareerRoadmap(careerContextService.buildForCurrentUser());
     }
 
     private User getAuthenticatedUser() {

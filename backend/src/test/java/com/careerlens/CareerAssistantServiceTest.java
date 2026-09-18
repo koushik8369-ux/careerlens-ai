@@ -3,6 +3,8 @@ package com.careerlens;
 import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.entity.CareerAssistantConversation;
 import com.careerlens.entity.CareerAssistantMessage;
@@ -139,5 +141,33 @@ class CareerAssistantServiceTest {
 
                 verify(careerContextService, never()).buildForCurrentUser();
                 verify(careerAiProvider, never()).improveResume(any());
+        }
+
+        @Test
+        void generatesRoadmapUsingAuthenticatedUserContext() {
+                UserCareerContext context = new UserCareerContext(
+                                "Backend Engineer", List.of("Java"), null, null, null, null, List.of(), List.of(), List.of(), List.of(),
+                                List.of(), List.of(), null, null, null, List.of(), List.of(), List.of(), List.of(), List.of());
+                CareerRoadmapResult result = new CareerRoadmapResult(List.of(
+                                new CareerRoadmapStage("SHORT_TERM", "Build foundations.", List.of("Learn Java"), List.of("Java")),
+                                new CareerRoadmapStage("MEDIUM_TERM", "Build evidence.", List.of("Build a project"), List.of("Java")),
+                                new CareerRoadmapStage("LONG_TERM", "Sustain progress.", List.of("Review progress"), List.of())));
+                when(careerContextService.buildForCurrentUser()).thenReturn(context);
+                when(careerAiProvider.generateCareerRoadmap(context)).thenReturn(result);
+
+                assertEquals(result, service.generateRoadmap());
+
+                verify(careerContextService).buildForCurrentUser();
+                verify(careerAiProvider).generateCareerRoadmap(context);
+        }
+
+        @Test
+        void rejectsRoadmapWithoutAuthentication() {
+                SecurityContextHolder.clearContext();
+
+                assertThrows(RuntimeException.class, () -> service.generateRoadmap());
+
+                verify(careerContextService, never()).buildForCurrentUser();
+                verify(careerAiProvider, never()).generateCareerRoadmap(any());
         }
 }
