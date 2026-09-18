@@ -147,3 +147,59 @@ export interface JobAnalysisResponse {
   interviewQuestions: InterviewQuestion[];
   createdAt: string;
 }
+
+// ── Phase 5: Career Assistant & Career Plan ────────────────────────────────
+
+export interface CareerAssistantConversation {
+  id: number;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CareerAssistantMessageRole = 'USER' | 'ASSISTANT';
+
+export interface CareerAssistantMessage {
+  id: number;
+  role: CareerAssistantMessageRole;
+  content: string;
+  provider: string | null;
+  createdAt: string;
+}
+
+export interface CareerAssistantMessageRequest {
+  question: string;
+}
+
+export type CareerAssistantMessageResponse = CareerAssistantMessage;
+
+export type CareerPlanStatus = 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+export type CareerPlanCategory = 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM';
+export type CareerPlanItemType = 'LEARNING' | 'PROJECT' | 'INTERVIEW' | 'RESUME';
+
+export interface CareerPlanItem {
+  id: number;
+  category: CareerPlanCategory;
+  itemType: CareerPlanItemType;
+  title: string;
+  description: string | null;
+  skills: string[];
+  priority: string;
+  completed: boolean;
+  sortOrder: number;
+}
+
+export interface CareerPlan {
+  id: number;
+  sourceResumeAnalysisId: number | null;
+  sourceJobAnalysisId: number | null;
+  careerGoal: string | null;
+  status: CareerPlanStatus;
+  createdAt: string;
+  updatedAt: string;
+  items: CareerPlanItem[];
+}
+
+export interface CareerPlanItemUpdateRequest {
+  completed: boolean;
+}
