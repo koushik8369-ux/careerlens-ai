@@ -139,6 +139,15 @@ class DeterministicCareerAiProviderTest {
     }
 
     @Test
+    void nullContextReturnsSafeResumeImprovementResult() {
+        ResumeImprovementResult result = provider.improveResume(null);
+
+        assertNotNull(result);
+        assertFalse(result.weakAreas().isEmpty());
+        assertFalse(result.missingContent().isEmpty());
+    }
+
+    @Test
     void repeatedExecutionProducesEquivalentResults() {
         assertEquals(provider.answerCareerQuestion(context, "What are my skill gaps?"),
                 provider.answerCareerQuestion(context, "What are my skill gaps?"));

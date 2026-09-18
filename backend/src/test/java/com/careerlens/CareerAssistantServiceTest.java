@@ -3,6 +3,7 @@ package com.careerlens;
 import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.entity.CareerAssistantConversation;
 import com.careerlens.entity.CareerAssistantMessage;
 import com.careerlens.entity.Role;
@@ -28,6 +29,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,7 +67,7 @@ class CareerAssistantServiceTest {
         authenticatedUser.setId(7L);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("owner@example.com", null, List.of()));
-        when(currentUserService.getRequiredUser("owner@example.com")).thenReturn(authenticatedUser);
+        lenient().when(currentUserService.getRequiredUser("owner@example.com")).thenReturn(authenticatedUser);
     }
 
     @AfterEach
@@ -112,4 +114,30 @@ class CareerAssistantServiceTest {
         verify(careerAiProvider).answerCareerQuestion(context, "What should I learn?");
         verify(conversationRepository).save(conversation);
     }
+
+        @Test
+        void improvesResumeUsingAuthenticatedUserContext() {
+                UserCareerContext context = new UserCareerContext(
+                                null, List.of(), null, null, null, null, List.of(), List.of(), List.of(), List.of(),
+                                List.of(), List.of(), null, null, null, List.of(), List.of(), List.of(), List.of(), List.of());
+                ResumeImprovementResult result = new ResumeImprovementResult(
+                                List.of("Missing project evidence"), List.of("Add a truthful project"), List.of("Use measurable outcomes"));
+                when(careerContextService.buildForCurrentUser()).thenReturn(context);
+                when(careerAiProvider.improveResume(context)).thenReturn(result);
+
+                assertEquals(result, service.improveResume());
+
+                verify(careerContextService).buildForCurrentUser();
+                verify(careerAiProvider).improveResume(context);
+        }
+
+        @Test
+        void rejectsResumeImprovementWithoutAuthentication() {
+                SecurityContextHolder.clearContext();
+
+                assertThrows(RuntimeException.class, () -> service.improveResume());
+
+                verify(careerContextService, never()).buildForCurrentUser();
+                verify(careerAiProvider, never()).improveResume(any());
+        }
 }

@@ -3,6 +3,7 @@ package com.careerlens.controller;
 import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageRequest;
 import com.careerlens.dto.CareerAssistantMessageResponse;
+import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.service.CareerAssistantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -41,5 +42,10 @@ public class CareerAssistantController {
             @PathVariable Long conversationId,
             @Valid @RequestBody CareerAssistantMessageRequest request) {
         return ResponseEntity.ok(careerAssistantService.sendMessage(conversationId, request.question()));
+    }
+
+    @PostMapping("/resume-improvement")
+    public ResponseEntity<ResumeImprovementResult> improveResume() {
+        return ResponseEntity.ok(careerAssistantService.improveResume());
     }
 }
