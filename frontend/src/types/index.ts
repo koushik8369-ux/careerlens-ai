@@ -179,6 +179,38 @@ export interface ResumeImprovementResult {
   strongerWordingSuggestions: string[];
 }
 
+export interface CareerRoadmapStage {
+  name: string;
+  objective: string;
+  actions: string[];
+  skills: string[];
+}
+
+export interface CareerRoadmapResult {
+  stages: CareerRoadmapStage[];
+}
+
+export interface ProjectRecommendation {
+  title: string;
+  description: string;
+  skills: string[];
+  rationale: string;
+}
+
+export interface ProjectRecommendationResult {
+  recommendations: ProjectRecommendation[];
+}
+
+export interface InterviewPreparationResult {
+  technicalTopics: string[];
+  behavioralQuestions: string[];
+  projectTalkingPoints: string[];
+}
+
+export interface CareerActionPlanResult {
+  actions: string[];
+}
+
 export type CareerPlanStatus = 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 export type CareerPlanCategory = 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM';
 export type CareerPlanItemType = 'LEARNING' | 'PROJECT' | 'INTERVIEW' | 'RESUME';
