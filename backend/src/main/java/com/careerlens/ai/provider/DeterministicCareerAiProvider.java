@@ -11,6 +11,7 @@ import com.careerlens.ai.provider.contracts.ProjectRecommendation;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,6 +23,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
+@ConditionalOnProperty(name = "app.ai.provider", havingValue = "deterministic", matchIfMissing = true)
 public class DeterministicCareerAiProvider implements CareerAiProvider {
 
     @Override

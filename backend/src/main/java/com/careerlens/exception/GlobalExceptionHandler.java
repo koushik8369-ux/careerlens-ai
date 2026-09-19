@@ -72,6 +72,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
+    @ExceptionHandler(CareerAiProviderException.class)
+    public ResponseEntity<ErrorResponse> handleCareerAiProvider(CareerAiProviderException ex) {
+        ErrorResponse response = new ErrorResponse(ex.getMessage(), HttpStatus.SERVICE_UNAVAILABLE.value());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
         ErrorResponse response = new ErrorResponse(
