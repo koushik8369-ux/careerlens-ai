@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Bot, Loader2, MessageSquarePlus } from 'lucide-react';
+import { AlertCircle, Bot, FileText, Loader2, MessageSquarePlus, Sparkles } from 'lucide-react';
 import axios from 'axios';
 import { CareerChat } from '../components/career/CareerChat';
 import {
   createCareerAssistantConversation,
   getCareerAssistantConversations,
   getCareerAssistantMessages,
+  requestResumeImprovement,
   sendCareerAssistantMessage,
 } from '../services/careerAssistantService';
-import type { CareerAssistantConversation, CareerAssistantMessage } from '../types';
+import type { CareerAssistantConversation, CareerAssistantMessage, ResumeImprovementResult } from '../types';
 
 const errorMessage = (error: unknown, fallback: string) => {
   if (!axios.isAxiosError(error)) return fallback;
@@ -25,6 +26,9 @@ export const CareerAssistantPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isImprovementLoading, setIsImprovementLoading] = useState(false);
+  const [resumeImprovement, setResumeImprovement] = useState<ResumeImprovementResult | null>(null);
+  const [improvementError, setImprovementError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadConversations = async () => {
@@ -85,6 +89,18 @@ export const CareerAssistantPage: React.FC = () => {
     }
   };
 
+  const handleResumeImprovement = async () => {
+    setIsImprovementLoading(true);
+    setImprovementError(null);
+    try {
+      setResumeImprovement(await requestResumeImprovement());
+    } catch (err: unknown) {
+      setImprovementError(errorMessage(err, 'Unable to generate resume improvement guidance.'));
+    } finally {
+      setIsImprovementLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-800 pb-5">
@@ -108,8 +124,48 @@ export const CareerAssistantPage: React.FC = () => {
         </aside>
         <CareerChat conversation={selected} messages={messages} isLoading={isMessagesLoading} isSending={isSending} error={null} onSend={handleSend} />
       </div>
+      <section className="glass-card p-5 sm:p-6" aria-labelledby="resume-improvement-heading">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div>
+            <h2 id="resume-improvement-heading" className="flex items-center gap-2 text-lg font-semibold text-white">
+              <FileText className="h-5 w-5 text-brand-400" /> Resume Improvement
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">Get focused guidance from your saved resume and career context.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleResumeImprovement()}
+            disabled={isImprovementLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isImprovementLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {isImprovementLoading ? 'Analyzing...' : 'Improve my resume'}
+          </button>
+        </div>
+        {improvementError && <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{improvementError}</div>}
+        {isImprovementLoading && <div className="flex min-h-32 flex-col items-center justify-center gap-2 text-sm text-slate-400"><Loader2 className="h-6 w-6 animate-spin text-brand-400" /><p>Reviewing your saved career context...</p></div>}
+        {!isImprovementLoading && !resumeImprovement && !improvementError && <div className="flex min-h-32 flex-col items-center justify-center text-center"><FileText className="mb-2 h-8 w-8 text-slate-500" /><p className="text-sm text-slate-300">No improvement guidance generated yet.</p><p className="mt-1 text-xs text-slate-500">Run the review to identify resume focus areas and stronger wording.</p></div>}
+        {!isImprovementLoading && resumeImprovement && <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <ImprovementList title="Weak areas" items={resumeImprovement.weakAreas} emptyMessage="No weak areas identified." />
+          <ImprovementList title="Missing content" items={resumeImprovement.missingContent} emptyMessage="No missing content identified." />
+          <ImprovementList title="Stronger wording suggestions" items={resumeImprovement.strongerWordingSuggestions} emptyMessage="No wording suggestions available." />
+        </div>}
+      </section>
     </div>
   );
 };
+
+interface ImprovementListProps {
+  title: string;
+  items: string[];
+  emptyMessage: string;
+}
+
+const ImprovementList: React.FC<ImprovementListProps> = ({ title, items, emptyMessage }) => (
+  <div className="rounded-xl border border-slate-800/80 bg-slate-950/30 p-4">
+    <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
+    {items.length > 0 ? <ul className="mt-3 space-y-2">{items.map((item, index) => <li key={`${title}-${index}`} className="flex gap-2 text-sm leading-6 text-slate-400"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-400" />{item}</li>)}</ul> : <p className="mt-3 text-sm text-slate-500">{emptyMessage}</p>}
+  </div>
+);
 
 export default CareerAssistantPage;

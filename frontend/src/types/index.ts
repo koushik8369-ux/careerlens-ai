@@ -173,6 +173,12 @@ export interface CareerAssistantMessageRequest {
 
 export type CareerAssistantMessageResponse = CareerAssistantMessage;
 
+export interface ResumeImprovementResult {
+  weakAreas: string[];
+  missingContent: string[];
+  strongerWordingSuggestions: string[];
+}
+
 export type CareerPlanStatus = 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 export type CareerPlanCategory = 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM';
 export type CareerPlanItemType = 'LEARNING' | 'PROJECT' | 'INTERVIEW' | 'RESUME';

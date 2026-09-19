@@ -5,6 +5,7 @@ import type {
   CareerAssistantMessageRequest,
   CareerPlan,
   CareerPlanItemUpdateRequest,
+  ResumeImprovementResult,
 } from '../types';
 
 export const createCareerAssistantConversation = async (): Promise<CareerAssistantConversation> => {
@@ -30,6 +31,11 @@ export const sendCareerAssistantMessage = async (
     `/career-assistant/conversations/${conversationId}/messages`,
     request,
   );
+  return response.data;
+};
+
+export const requestResumeImprovement = async (): Promise<ResumeImprovementResult> => {
+  const response = await api.post<ResumeImprovementResult>('/career-assistant/resume-improvement');
   return response.data;
 };
 
