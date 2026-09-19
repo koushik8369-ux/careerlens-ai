@@ -4,6 +4,7 @@ import com.careerlens.ai.context.CareerSkillGap;
 import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.DeterministicCareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
@@ -168,6 +169,21 @@ class DeterministicCareerAiProviderTest {
     }
 
     @Test
+    void emptyContextReturnsSafeActionPlan() {
+        CareerActionPlanResult result = provider.generateActionPlan(null);
+
+        assertFalse(result.actions().isEmpty());
+    }
+
+    @Test
+    void actionPlanPrioritizesStructuredSkillAndResumeGaps() {
+        CareerActionPlanResult result = provider.generateActionPlan(context);
+
+        assertTrue(result.actions().get(0).contains("Docker"));
+        assertTrue(result.actions().stream().anyMatch(action -> action.contains("Certifications")));
+    }
+
+    @Test
     void interviewPreparationUsesStructuredJobAndProjectContext() {
         InterviewPreparationResult result = provider.prepareForInterview(context);
 
@@ -183,5 +199,6 @@ class DeterministicCareerAiProviderTest {
         assertEquals(provider.improveResume(context), provider.improveResume(context));
         assertEquals(provider.generateCareerRoadmap(context), provider.generateCareerRoadmap(context));
         assertEquals(provider.prepareForInterview(context), provider.prepareForInterview(context));
+        assertEquals(provider.generateActionPlan(context), provider.generateActionPlan(context));
     }
 }

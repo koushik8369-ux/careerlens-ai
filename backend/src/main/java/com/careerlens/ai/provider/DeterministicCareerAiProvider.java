@@ -3,6 +3,7 @@ package com.careerlens.ai.provider;
 import com.careerlens.ai.context.CareerSkillGap;
 import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
 import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
@@ -57,6 +58,30 @@ public class DeterministicCareerAiProvider implements CareerAiProvider {
                         + "support your profile with truthful resume evidence and practical projects. "
                         + missingInformation(safeContext),
                 List.of("What is my career goal?", "Which skills should I improve next?", "How can I improve my resume?"));
+    }
+
+    @Override
+    public CareerActionPlanResult generateActionPlan(UserCareerContext context) {
+        UserCareerContext safeContext = context == null ? emptyContext() : context;
+        List<String> actions = new ArrayList<>();
+        Set<String> existingSkills = normalizedSkillSet(safeContext);
+        List<String> skillGaps = filteredMissingSkills(safeContext.getLatestJobRequiredSkills(), existingSkills);
+        skillGaps = mergeDistinct(skillGaps,
+                filteredMissingSkills(safeContext.getLatestJobPreferredSkills(), existingSkills));
+        if (!skillGaps.isEmpty()) {
+            actions.add("Prioritize practice for these role-relevant skill gaps: " + join(skillGaps) + ".");
+        }
+        if (!safeContext.getResumeMissingSections().isEmpty()) {
+            actions.add("Address the structured resume gaps: " + join(safeContext.getResumeMissingSections()) + ".");
+        }
+        if (safeContext.getResumeProjects().isEmpty()) {
+            actions.add("Build one small project aligned with your career direction and document the decisions and truthful outcome.");
+        }
+        if (actions.isEmpty()) {
+            actions.add("Confirm your target role and choose one measurable skill or outcome to improve this week.");
+            actions.add("Document evidence of your current skills through a truthful project, resume entry, or work example.");
+        }
+        return new CareerActionPlanResult(distinct(actions));
     }
 
     @Override

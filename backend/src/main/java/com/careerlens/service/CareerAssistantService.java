@@ -2,6 +2,7 @@ package com.careerlens.service;
 
 import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageResponse;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
@@ -18,6 +19,8 @@ public interface CareerAssistantService {
     List<CareerAssistantMessageResponse> getConversationMessages(Long conversationId);
 
     CareerAssistantMessageResponse sendMessage(Long conversationId, String question);
+
+    CareerActionPlanResult generateActionPlan();
 
     ResumeImprovementResult improveResume();
 
