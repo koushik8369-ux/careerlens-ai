@@ -5,6 +5,9 @@ import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
+import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
+import com.careerlens.ai.provider.contracts.ProjectRecommendation;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import org.springframework.stereotype.Component;
 
@@ -158,6 +161,66 @@ public class DeterministicCareerAiProvider implements CareerAiProvider {
                 new CareerRoadmapStage("MEDIUM_TERM", "Create evidence of applied ability for " + goal + ".", distinct(mediumTermActions), distinct(mediumTermSkills)),
                 new CareerRoadmapStage("LONG_TERM", "Sustain progress toward " + goal + ".", distinct(longTermActions), distinct(longTermSkills))));
     }
+
+    @Override
+    public ProjectRecommendationResult recommendProjects(UserCareerContext context) {
+        UserCareerContext safeContext = context == null ? emptyContext() : context;
+        Set<String> existingSkills = normalizedSkillSet(safeContext);
+        List<String> gaps = filteredMissingSkills(safeContext.getLatestJobRequiredSkills(), existingSkills);
+        gaps = mergeDistinct(gaps, filteredMissingSkills(safeContext.getLatestJobPreferredSkills(), existingSkills));
+        if (gaps.isEmpty()) {
+            gaps = filteredMissingSkills(safeContext.getLatestJobMissingSkills(), existingSkills);
+        }
+
+        List<ProjectRecommendation> recommendations = new ArrayList<>();
+        for (String skill : gaps.stream().limit(3).toList()) {
+            recommendations.add(new ProjectRecommendation(
+                    projectFor(skill),
+                    "Create a focused, truthful project with documented decisions, implementation details, and measurable outcomes.",
+                    List.of(skill),
+                    "This project addresses an unaddressed skill in the available job context."));
+        }
+        if (recommendations.isEmpty()) {
+            String goal = safeContext.getCareerGoal() == null ? "your target career direction" : safeContext.getCareerGoal();
+            recommendations.add(new ProjectRecommendation(
+                    "Build a portfolio project aligned with " + goal + ".",
+                    "Choose a small problem, implement it end to end, and document the problem, your contribution, technologies, and truthful outcome.",
+                    mergedSkills(safeContext),
+                    "No unaddressed job skills are available, so the recommendation establishes evidence for your career direction."));
+        }
+        return new ProjectRecommendationResult(recommendations);
+    }
+
+        @Override
+        public InterviewPreparationResult prepareForInterview(UserCareerContext context) {
+        UserCareerContext safeContext = context == null ? emptyContext() : context;
+        String role = safeContext.getLatestJobTitle() == null
+            ? safeContext.getCareerGoal() == null ? "your target role" : safeContext.getCareerGoal()
+            : safeContext.getLatestJobTitle();
+
+        List<String> technicalTopics = safeContext.getLatestJobRequiredSkills().isEmpty()
+            ? mergedSkills(safeContext)
+            : distinct(safeContext.getLatestJobRequiredSkills());
+        if (technicalTopics.isEmpty()) {
+            technicalTopics = List.of("Review the fundamentals most relevant to " + role + ".");
+        }
+
+        List<String> behavioralQuestions = List.of(
+            "Describe a challenging problem you solved and how you approached it.",
+            "Tell me about a time you received difficult feedback and what you changed.",
+            "Why are you interested in " + role + "?");
+
+        List<String> projectTalkingPoints = safeContext.getResumeProjects().stream()
+            .filter(project -> project != null && !project.isBlank())
+            .map(project -> "Explain the problem, your contribution, technical decisions, and truthful outcome for: " + project + ".")
+            .toList();
+        if (projectTalkingPoints.isEmpty()) {
+            projectTalkingPoints = List.of(
+                "Prepare one concise project walkthrough covering the problem, your contribution, technical decisions, and outcome.");
+        }
+
+        return new InterviewPreparationResult(technicalTopics, behavioralQuestions, projectTalkingPoints);
+        }
 
     private CareerAssistantAnswer answerCareerGoal(UserCareerContext context) {
         String goal = context.getCareerGoal();

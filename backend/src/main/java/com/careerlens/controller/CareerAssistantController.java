@@ -3,6 +3,10 @@ package com.careerlens.controller;
 import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageRequest;
 import com.careerlens.dto.CareerAssistantMessageResponse;
+import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
+import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
+import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.service.CareerAssistantService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -41,5 +45,25 @@ public class CareerAssistantController {
             @PathVariable Long conversationId,
             @Valid @RequestBody CareerAssistantMessageRequest request) {
         return ResponseEntity.ok(careerAssistantService.sendMessage(conversationId, request.question()));
+    }
+
+    @PostMapping("/resume-improvement")
+    public ResponseEntity<ResumeImprovementResult> improveResume() {
+        return ResponseEntity.ok(careerAssistantService.improveResume());
+    }
+
+    @PostMapping("/roadmap")
+    public ResponseEntity<CareerRoadmapResult> generateRoadmap() {
+        return ResponseEntity.ok(careerAssistantService.generateRoadmap());
+    }
+
+    @PostMapping("/projects")
+    public ResponseEntity<ProjectRecommendationResult> recommendProjects() {
+        return ResponseEntity.ok(careerAssistantService.recommendProjects());
+    }
+
+    @PostMapping("/interview-preparation")
+    public ResponseEntity<InterviewPreparationResult> prepareForInterview() {
+        return ResponseEntity.ok(careerAssistantService.prepareForInterview());
     }
 }
