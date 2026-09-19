@@ -3,6 +3,7 @@ package com.careerlens.controller;
 import com.careerlens.dto.CareerAssistantConversationResponse;
 import com.careerlens.dto.CareerAssistantMessageRequest;
 import com.careerlens.dto.CareerAssistantMessageResponse;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
@@ -45,6 +46,11 @@ public class CareerAssistantController {
             @PathVariable Long conversationId,
             @Valid @RequestBody CareerAssistantMessageRequest request) {
         return ResponseEntity.ok(careerAssistantService.sendMessage(conversationId, request.question()));
+    }
+
+    @PostMapping("/action-plan")
+    public ResponseEntity<CareerActionPlanResult> generateActionPlan() {
+        return ResponseEntity.ok(careerAssistantService.generateActionPlan());
     }
 
     @PostMapping("/resume-improvement")

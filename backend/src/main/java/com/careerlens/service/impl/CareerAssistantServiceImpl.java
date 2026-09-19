@@ -2,6 +2,7 @@ package com.careerlens.service.impl;
 
 import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
@@ -103,6 +104,13 @@ public class CareerAssistantServiceImpl implements CareerAssistantService {
         conversation.setUpdatedAt(LocalDateTime.now());
         conversationRepository.save(conversation);
         return toMessageResponse(savedAssistantMessage);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CareerActionPlanResult generateActionPlan() {
+        getAuthenticatedUser();
+        return careerAiProvider.generateActionPlan(careerContextService.buildForCurrentUser());
     }
 
     @Override

@@ -107,6 +107,24 @@ class CareerAssistantControllerTest {
                                         .andExpect(jsonPath("$.projectTalkingPoints").isArray());
                 }
 
+                @Test
+                void actionPlanRequiresAuthentication() throws Exception {
+                        mockMvc.perform(post("/api/career-assistant/action-plan"))
+                                        .andExpect(status().isUnauthorized());
+                }
+
+                @Test
+                void authenticatedUserCanRequestActionPlanWithMinimalContext() throws Exception {
+                        String email = "action-plan-" + UUID.randomUUID() + "@example.com";
+                        String token = registerAndLogin(email);
+
+                        mockMvc.perform(post("/api/career-assistant/action-plan")
+                                                        .header("Authorization", "Bearer " + token))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.actions").isArray())
+                                        .andExpect(jsonPath("$.actions").isNotEmpty());
+                }
+
     private String registerAndLogin(String email) throws Exception {
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)

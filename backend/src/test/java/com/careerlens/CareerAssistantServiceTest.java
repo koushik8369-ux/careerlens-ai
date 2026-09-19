@@ -3,6 +3,7 @@ package com.careerlens;
 import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
 import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
@@ -119,6 +120,31 @@ class CareerAssistantServiceTest {
         verify(careerAiProvider).answerCareerQuestion(context, "What should I learn?");
         verify(conversationRepository).save(conversation);
     }
+
+        @Test
+        void generatesActionPlanUsingAuthenticatedUserContext() {
+                UserCareerContext context = new UserCareerContext(
+                                "Backend Engineer", List.of("Java"), null, null, null, null, List.of(), List.of(), List.of(), List.of(),
+                                List.of(), List.of(), "Backend Engineer", null, null, List.of("Java"), List.of(), List.of(), List.of(), List.of());
+                CareerActionPlanResult result = new CareerActionPlanResult(List.of("Practice Java."));
+                when(careerContextService.buildForCurrentUser()).thenReturn(context);
+                when(careerAiProvider.generateActionPlan(context)).thenReturn(result);
+
+                assertEquals(result, service.generateActionPlan());
+
+                verify(careerContextService).buildForCurrentUser();
+                verify(careerAiProvider).generateActionPlan(context);
+        }
+
+        @Test
+        void rejectsActionPlanWithoutAuthentication() {
+                SecurityContextHolder.clearContext();
+
+                assertThrows(RuntimeException.class, () -> service.generateActionPlan());
+
+                verify(careerContextService, never()).buildForCurrentUser();
+                verify(careerAiProvider, never()).generateActionPlan(any());
+        }
 
         @Test
         void improvesResumeUsingAuthenticatedUserContext() {
