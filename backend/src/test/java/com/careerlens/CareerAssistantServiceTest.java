@@ -5,6 +5,7 @@ import com.careerlens.ai.provider.CareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapStage;
+import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendation;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
@@ -187,6 +188,32 @@ class CareerAssistantServiceTest {
 
                 verify(careerContextService).buildForCurrentUser();
                 verify(careerAiProvider).recommendProjects(context);
+        }
+
+        @Test
+        void preparesForInterviewUsingAuthenticatedUserContext() {
+                UserCareerContext context = new UserCareerContext(
+                                "Backend Engineer", List.of("Java"), null, null, null, null, List.of(), List.of(), List.of(), List.of(),
+                                List.of(), List.of(), "Backend Engineer", null, null, List.of("Java"), List.of(), List.of(), List.of(), List.of());
+                InterviewPreparationResult result = new InterviewPreparationResult(
+                                List.of("Java"), List.of("Describe a challenge."), List.of("Explain your project."));
+                when(careerContextService.buildForCurrentUser()).thenReturn(context);
+                when(careerAiProvider.prepareForInterview(context)).thenReturn(result);
+
+                assertEquals(result, service.prepareForInterview());
+
+                verify(careerContextService).buildForCurrentUser();
+                verify(careerAiProvider).prepareForInterview(context);
+        }
+
+        @Test
+        void rejectsInterviewPreparationWithoutAuthentication() {
+                SecurityContextHolder.clearContext();
+
+                assertThrows(RuntimeException.class, () -> service.prepareForInterview());
+
+                verify(careerContextService, never()).buildForCurrentUser();
+                verify(careerAiProvider, never()).prepareForInterview(any());
         }
 
         @Test

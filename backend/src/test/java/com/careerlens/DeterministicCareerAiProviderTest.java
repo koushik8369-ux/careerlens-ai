@@ -5,6 +5,7 @@ import com.careerlens.ai.context.UserCareerContext;
 import com.careerlens.ai.provider.DeterministicCareerAiProvider;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
 import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -158,10 +159,29 @@ class DeterministicCareerAiProviderTest {
     }
 
     @Test
+    void emptyContextReturnsSafeInterviewPreparation() {
+        InterviewPreparationResult result = provider.prepareForInterview(null);
+
+        assertFalse(result.technicalTopics().isEmpty());
+        assertFalse(result.behavioralQuestions().isEmpty());
+        assertFalse(result.projectTalkingPoints().isEmpty());
+    }
+
+    @Test
+    void interviewPreparationUsesStructuredJobAndProjectContext() {
+        InterviewPreparationResult result = provider.prepareForInterview(context);
+
+        assertEquals(List.of("Java", "Docker"), result.technicalTopics());
+        assertTrue(result.behavioralQuestions().stream().anyMatch(question -> question.contains("Backend Engineer")));
+        assertTrue(result.projectTalkingPoints().stream().anyMatch(point -> point.contains("CareerLens project")));
+    }
+
+    @Test
     void repeatedExecutionProducesEquivalentResults() {
         assertEquals(provider.answerCareerQuestion(context, "What are my skill gaps?"),
                 provider.answerCareerQuestion(context, "What are my skill gaps?"));
         assertEquals(provider.improveResume(context), provider.improveResume(context));
         assertEquals(provider.generateCareerRoadmap(context), provider.generateCareerRoadmap(context));
+        assertEquals(provider.prepareForInterview(context), provider.prepareForInterview(context));
     }
 }
