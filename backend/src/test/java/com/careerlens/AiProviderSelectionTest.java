@@ -27,6 +27,29 @@ class AiProviderSelectionTest {
         });
     }
 
+        @Test
+        void missingProviderPropertyDefaultsToDeterministic() {
+        new ApplicationContextRunner()
+            .withUserConfiguration(com.careerlens.ai.provider.AiProviderConfiguration.class,
+                DeterministicCareerAiProvider.class)
+            .withBean(RestClient.Builder.class, RestClient::builder)
+            .withBean(ObjectMapper.class, ObjectMapper::new)
+            .run(context -> assertInstanceOf(DeterministicCareerAiProvider.class,
+                context.getBean(CareerAiProvider.class)));
+        }
+
+        @Test
+        void llmPropertySelectsLlmProvider() {
+        contextRunner.withPropertyValues(
+                "app.ai.provider=llm",
+                "app.ai.llm.api-key=test-key",
+                "app.ai.llm.base-url=http://localhost:9999/v1",
+                "app.ai.llm.model=test-model")
+            .run(context -> assertInstanceOf(
+                com.careerlens.ai.provider.LlmCareerAiProvider.class,
+                context.getBean(CareerAiProvider.class)));
+        }
+
     @Test
     void llmSelectionRequiresAnApiKey() {
         contextRunner.withPropertyValues("app.ai.provider=llm", "app.ai.llm.api-key=")

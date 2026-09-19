@@ -5,8 +5,11 @@ import com.careerlens.ai.provider.CareerAiPromptBuilder;
 import com.careerlens.ai.provider.LlmCareerAiProvider;
 import com.careerlens.ai.provider.LlmProperties;
 import com.careerlens.ai.provider.contracts.CareerAssistantAnswer;
+import com.careerlens.ai.provider.contracts.CareerActionPlanResult;
 import com.careerlens.ai.provider.contracts.CareerRoadmapResult;
+import com.careerlens.ai.provider.contracts.InterviewPreparationResult;
 import com.careerlens.ai.provider.contracts.ProjectRecommendationResult;
+import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 import com.careerlens.exception.CareerAiProviderException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +19,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +30,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.http.HttpMethod.POST;
 
@@ -80,6 +85,27 @@ class LlmCareerAiProviderTest {
     }
 
     @Test
+    void mapsResumeInterviewAndActionPlanContracts() {
+        server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
+                .andRespond(jsonResponse("{\"weakAreas\":[\"Missing metrics\"],\"missingContent\":[\"Add outcomes\"],\"strongerWordingSuggestions\":[\"Use action verbs\"]}"));
+        ResumeImprovementResult resume = provider.improveResume(context);
+        assertEquals(List.of("Missing metrics"), resume.weakAreas());
+
+        server.reset();
+        server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
+                .andRespond(jsonResponse("{\"technicalTopics\":[\"Java\"],\"behavioralQuestions\":[\"Describe a challenge\"],\"projectTalkingPoints\":[\"Explain the API\"]}"));
+        InterviewPreparationResult interview = provider.prepareForInterview(context);
+        assertEquals(List.of("Java"), interview.technicalTopics());
+
+        server.reset();
+        server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
+                .andRespond(jsonResponse("{\"actions\":[\"Practice Java\"]}"));
+        CareerActionPlanResult actionPlan = provider.generateActionPlan(context);
+        assertEquals(List.of("Practice Java"), actionPlan.actions());
+        server.verify();
+    }
+
+    @Test
     void acceptsJsonCodeFenceAndRejectsMalformedResponse() {
         server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
                 .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"```json\\n{\\\"actions\\\":[\\\"Do this.\\\"]}\\n```\"}}]}", org.springframework.http.MediaType.APPLICATION_JSON));
@@ -105,6 +131,47 @@ class LlmCareerAiProviderTest {
     }
 
     @Test
+    void convertsUnauthorizedForbiddenAndServerErrorsToSafeApplicationErrors() {
+        for (HttpStatus status : List.of(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN, HttpStatus.INTERNAL_SERVER_ERROR)) {
+            server.reset();
+            server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
+                    .andRespond(withStatus(status).body("upstream secret body"));
+
+            CareerAiProviderException exception = assertThrows(
+                    CareerAiProviderException.class, () -> provider.generateActionPlan(context));
+
+            assertEquals("The AI provider request failed. Please try again later.", exception.getMessage());
+        }
+    }
+
+    @Test
+    void convertsEmptyContentToSafeApplicationError() {
+        server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
+                .andRespond(jsonResponse("{\"choices\":[{\"message\":{\"content\":\" \"}}]}"));
+
+        CareerAiProviderException exception = assertThrows(
+                CareerAiProviderException.class, () -> provider.generateActionPlan(context));
+
+        assertEquals("The AI provider returned an invalid response.", exception.getMessage());
+    }
+
+    @Test
+    void convertsTimeoutAndConnectionFailuresToSafeApplicationErrors() {
+        server.expect(requestTo("http://localhost:9999/v1/chat/completions"))
+                .andRespond(withException(new IOException("simulated timeout")));
+        CareerAiProviderException timeout = assertThrows(
+                CareerAiProviderException.class, () -> provider.generateActionPlan(context));
+        assertTrue(timeout.getMessage().contains("timed out or is unreachable"));
+
+        LlmCareerAiProvider unreachableProvider = new LlmCareerAiProvider(
+                RestClient.builder().baseUrl("http://localhost:1/v1").build(),
+                new ObjectMapper(), new CareerAiPromptBuilder(new ObjectMapper()), properties());
+        CareerAiProviderException connection = assertThrows(
+                CareerAiProviderException.class, () -> unreachableProvider.generateActionPlan(context));
+        assertTrue(connection.getMessage().contains("timed out or is unreachable"));
+    }
+
+    @Test
     void rejectsMissingConfigurationBeforeBuildingClient() {
         LlmProperties invalid = properties();
         invalid.setApiKey("");
@@ -124,4 +191,10 @@ class LlmCareerAiProviderTest {
         properties.setTimeout(Duration.ofSeconds(2));
         return properties;
     }
+
+        private org.springframework.test.web.client.response.DefaultResponseCreator jsonResponse(String content) {
+                return withSuccess(
+                                "{\"choices\":[{\"message\":{\"content\":" + new ObjectMapper().valueToTree(content).toString() + "}}]}",
+                                org.springframework.http.MediaType.APPLICATION_JSON);
+        }
 }
