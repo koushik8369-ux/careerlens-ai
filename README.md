@@ -50,13 +50,13 @@ CareerLens AI is a Smart Career Intelligence Platform for analyzing career profi
 - Interview Preparation API
 - Career Action Plan API
 - Deterministic AI provider architecture for repeatable career guidance without an external LLM dependency
+- Optional OpenAI-compatible LLM provider with validated local configuration and opt-in smoke testing
 
 The backend resolves the authenticated user from the security context and builds provider input from structured, user-owned career data. The APIs do not require a frontend-supplied `userId`.
 
-## Future and Planned Features
+## Provider Modes
 
-- External LLM provider integration. The current implementation uses the deterministic provider; API keys in the environment example are placeholders only.
-- Additional AI provider implementations can be added behind the existing `CareerAiProvider` contract.
+The deterministic provider is the default and requires no external AI service. An optional OpenAI-compatible LLM provider can be enabled with `AI_PROVIDER=llm`. The provider must expose `/chat/completions`; keep `LLM_API_KEY` only in environment variables or an ignored local `.env` file.
 
 ## Backend API
 
@@ -147,9 +147,10 @@ DB_USERNAME=<mysql-username>
 DB_PASSWORD=<mysql-password>
 JWT_SECRET=<at-least-32-byte-secret>
 JWT_EXPIRATION=86400000
+CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-The backend loads these values from `backend/.env` or environment variables. Do not commit `.env` or place real credentials in source control. CORS is configured for the local frontend at `http://localhost:5173`.
+The backend loads these values from `backend/.env` or environment variables. Do not commit `.env` or place real credentials in source control. Local development allows `http://localhost:5173` by default; production must set `CORS_ALLOWED_ORIGINS` to explicit frontend origin(s).
 
 ### Local AI Provider Configuration
 
@@ -169,6 +170,17 @@ LLM_TIMEOUT=30s
 ```
 
 `LLM_BASE_URL` must point to a provider exposing an OpenAI-compatible `/chat/completions` endpoint. The LLM provider validates the key, base URL, model, and positive timeout during startup. Keep API keys only in `.env` or environment variables; never commit or print them. The equivalent Spring properties are `app.ai.provider` and `app.ai.llm.*`.
+
+### Production Configuration
+
+Start the backend with the production profile after supplying `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS` through the deployment environment or secret manager:
+
+```powershell
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+The production profile validates the existing schema, disables SQL and formatted SQL logging, uses INFO-level application logging, preserves the multipart limits, and requires explicit CORS origins. It does not create or update database schema automatically; apply compatible schema changes separately.
 
 ### Run the Backend
 

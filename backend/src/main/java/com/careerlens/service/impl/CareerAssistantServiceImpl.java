@@ -31,7 +31,7 @@ import java.util.List;
 @Service
 public class CareerAssistantServiceImpl implements CareerAssistantService {
 
-    private static final String DETERMINISTIC_PROVIDER = "deterministic";
+    private static final String DEFAULT_PROVIDER = "deterministic";
     private static final String DEFAULT_TITLE = "Career Assistant";
     private static final int MAX_QUESTION_LENGTH = 2000;
 
@@ -94,8 +94,12 @@ public class CareerAssistantServiceImpl implements CareerAssistantService {
 
         CareerAssistantAnswer answer = careerAiProvider.answerCareerQuestion(
                 careerContextService.buildForCurrentUser(), normalizedQuestion);
+        String providerName = careerAiProvider.providerName();
+        if (providerName == null || providerName.isBlank()) {
+            providerName = DEFAULT_PROVIDER;
+        }
         CareerAssistantMessage assistantMessage = newMessage(
-                conversation, CareerAssistantMessage.Role.ASSISTANT, answer.answer(), DETERMINISTIC_PROVIDER);
+            conversation, CareerAssistantMessage.Role.ASSISTANT, answer.answer(), providerName);
         CareerAssistantMessage savedAssistantMessage = messageRepository.save(assistantMessage);
 
         if (DEFAULT_TITLE.equals(conversation.getTitle())) {

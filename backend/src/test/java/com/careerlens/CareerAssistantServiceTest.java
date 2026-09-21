@@ -121,6 +121,28 @@ class CareerAssistantServiceTest {
         verify(conversationRepository).save(conversation);
     }
 
+    @Test
+    void storesConfiguredLlmProviderLabelOnAssistantMessage() {
+        CareerAssistantConversation conversation = new CareerAssistantConversation();
+        conversation.setId(43L);
+        conversation.setUser(authenticatedUser);
+        conversation.setTitle("Career Assistant");
+        when(conversationRepository.findByIdAndUserId(43L, 7L)).thenReturn(Optional.of(conversation));
+        UserCareerContext context = new UserCareerContext(
+                null, List.of(), null, null, null, null, List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), null, null, null, List.of(), List.of(), List.of(), List.of(), List.of());
+        when(careerContextService.buildForCurrentUser()).thenReturn(context);
+        when(careerAiProvider.providerName()).thenReturn("llm");
+        when(careerAiProvider.answerCareerQuestion(context, "What should I learn?"))
+                .thenReturn(new CareerAssistantAnswer("Use the configured provider.", List.of()));
+        when(messageRepository.save(any(CareerAssistantMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.sendMessage(43L, "What should I learn?");
+
+        assertEquals("llm", response.provider());
+    }
+
         @Test
         void generatesActionPlanUsingAuthenticatedUserContext() {
                 UserCareerContext context = new UserCareerContext(
