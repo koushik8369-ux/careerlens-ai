@@ -183,6 +183,36 @@ class LlmCareerAiProviderTest {
         assertTrue(exception.getMessage().contains("LLM_API_KEY"));
     }
 
+        @Test
+        void rejectsInvalidBaseUrlWithoutExposingApiKey() {
+                LlmProperties invalid = properties();
+                invalid.setBaseUrl("not-a-url");
+
+                IllegalStateException exception = assertThrows(IllegalStateException.class,
+                                () -> new LlmCareerAiProvider(RestClient.builder(), new ObjectMapper(),
+                                                new CareerAiPromptBuilder(new ObjectMapper()), invalid));
+
+                assertEquals("LLM_BASE_URL must be an HTTP(S) URL", exception.getMessage());
+                assertTrue(!exception.getMessage().contains(invalid.getApiKey()));
+        }
+
+        @Test
+        void rejectsMissingModelAndNonPositiveTimeout() {
+                LlmProperties missingModel = properties();
+                missingModel.setModel("");
+                IllegalStateException modelException = assertThrows(IllegalStateException.class,
+                                () -> new LlmCareerAiProvider(RestClient.builder(), new ObjectMapper(),
+                                                new CareerAiPromptBuilder(new ObjectMapper()), missingModel));
+                assertTrue(modelException.getMessage().contains("LLM_MODEL"));
+
+                LlmProperties invalidTimeout = properties();
+                invalidTimeout.setTimeout(Duration.ZERO);
+                IllegalStateException timeoutException = assertThrows(IllegalStateException.class,
+                                () -> new LlmCareerAiProvider(RestClient.builder(), new ObjectMapper(),
+                                                new CareerAiPromptBuilder(new ObjectMapper()), invalidTimeout));
+                assertEquals("LLM timeout must be positive", timeoutException.getMessage());
+        }
+
     private LlmProperties properties() {
         LlmProperties properties = new LlmProperties();
         properties.setApiKey("test-key");

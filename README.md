@@ -151,6 +151,25 @@ JWT_EXPIRATION=86400000
 
 The backend loads these values from `backend/.env` or environment variables. Do not commit `.env` or place real credentials in source control. CORS is configured for the local frontend at `http://localhost:5173`.
 
+### Local AI Provider Configuration
+
+The backend uses deterministic career guidance by default, so it starts without LLM credentials:
+
+```properties
+AI_PROVIDER=deterministic
+```
+
+To use a real OpenAI-compatible provider locally, set `AI_PROVIDER=llm` and provide these values in `backend/.env` or the process environment:
+
+```properties
+LLM_API_KEY=<provider-key>
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+LLM_TIMEOUT=30s
+```
+
+`LLM_BASE_URL` must point to a provider exposing an OpenAI-compatible `/chat/completions` endpoint. The LLM provider validates the key, base URL, model, and positive timeout during startup. Keep API keys only in `.env` or environment variables; never commit or print them. The equivalent Spring properties are `app.ai.provider` and `app.ai.llm.*`.
+
 ### Run the Backend
 
 ```powershell
@@ -189,6 +208,15 @@ Run backend tests from `backend/`:
 ```powershell
 mvn clean test
 ```
+
+Normal tests are completely offline. An optional real-provider smoke test is skipped unless explicitly enabled and all LLM environment variables are present:
+
+```powershell
+$env:CAREERLENS_LLM_SMOKE_TEST="true"
+mvn test
+```
+
+The smoke test makes one real chat request, verifies that the response maps to `CareerAssistantAnswer`, and reports only safe generic diagnostics. Unset `CAREERLENS_LLM_SMOKE_TEST` after the check. A Maven property can also enable it with `mvn -Dllm.smoke.test=true test`.
 
 Build the frontend from `frontend/`:
 
