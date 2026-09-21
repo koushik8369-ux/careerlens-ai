@@ -57,7 +57,6 @@ services:
   - type: web
     name: careerlens-frontend
     runtime: static
-    region: oregon
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
