@@ -182,6 +182,16 @@ mvn spring-boot:run -Dspring-boot.run.profiles=prod
 
 The production profile validates the existing schema, disables SQL and formatted SQL logging, uses INFO-level application logging, preserves the multipart limits, and requires explicit CORS origins. It does not create or update database schema automatically; apply compatible schema changes separately.
 
+### Production Database Bootstrap
+
+Production uses `spring.jpa.hibernate.ddl-auto=validate`, so a compatible MySQL schema must exist before the backend starts. The deterministic bootstrap schema is [backend/src/main/resources/db/schema.sql](backend/src/main/resources/db/schema.sql). Run it against an empty production database with the MySQL client:
+
+```powershell
+mysql -u <username> -p <database_name> < backend/src/main/resources/db/schema.sql
+```
+
+Local development continues to use the existing `ddl-auto=update` configuration and does not require this bootstrap step.
+
 ### Run the Backend
 
 ```powershell
