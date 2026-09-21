@@ -215,6 +215,20 @@ docker build --build-arg VITE_API_BASE_URL=<backend-api-url> -t careerlens-front
 
 `VITE_API_BASE_URL` is compiled into the Vite bundle and must be supplied during the frontend image build. The frontend image serves the generated static files through Nginx and supports React route refreshes through SPA fallback. Do not put secrets in frontend build arguments or source control.
 
+### Render Deployment
+
+The repository includes [render.yaml](render.yaml) for the planned provider-neutral Render architecture: an Oregon private MySQL 8 service, an Oregon Docker backend service, and a React static site. Render can create the services from the repository blueprint; do not replace MySQL with PostgreSQL.
+
+1. In Render, create a new Blueprint from `koushik8369-ux/careerlens-ai` and select the `feature/user-profile-dashboard` branch.
+2. Select Oregon for the services. Use the generated Render values for service URLs, private service connection details, and credentials; never copy local `.env` values into the blueprint.
+3. For the MySQL private service, enter values for `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD` in Render. The image copies `backend/src/main/resources/db/schema.sql` into MySQL's first-start initialization directory and does not seed data.
+4. For the backend service, set `DB_URL` to the exact private MySQL JDBC URL provided by the Render database service, and set `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS` as runtime environment variables. Keep `SPRING_PROFILES_ACTIVE=prod` and `AI_PROVIDER=deterministic` unless LLM mode is intentionally configured.
+5. Wait for the backend health check to pass at `/api/health`.
+6. Set the frontend `VITE_API_BASE_URL` to the deployed backend URL ending in `/api`. This is a build-time variable for the static site.
+7. After Render provides the frontend URL, set backend `CORS_ALLOWED_ORIGINS` to that exact frontend origin and redeploy the backend if needed.
+
+The Render blueprint marks secret values as unsynchronized so they must be entered in Render's environment settings. Backend secrets are runtime values; `VITE_API_BASE_URL` is a non-secret frontend build-time value. The production database schema is validated with `ddl-auto=validate`, so the database must initialize successfully before the backend starts.
+
 ### Production Database Bootstrap
 
 Production uses `spring.jpa.hibernate.ddl-auto=validate`, so a compatible MySQL schema must exist before the backend starts. The deterministic bootstrap schema is [backend/src/main/resources/db/schema.sql](backend/src/main/resources/db/schema.sql). Run it against an empty production database with the MySQL client:
