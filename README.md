@@ -182,6 +182,39 @@ mvn spring-boot:run -Dspring-boot.run.profiles=prod
 
 The production profile validates the existing schema, disables SQL and formatted SQL logging, uses INFO-level application logging, preserves the multipart limits, and requires explicit CORS origins. It does not create or update database schema automatically; apply compatible schema changes separately.
 
+### Container Packaging
+
+The repository includes provider-neutral Docker packaging for the backend and frontend. MySQL remains external; do not put database credentials or other secrets in either image.
+
+Build the backend image from the repository root:
+
+```powershell
+docker build -t careerlens-backend ./backend
+```
+
+Run it with the production runtime variables supplied by the deployment environment or secret manager:
+
+```powershell
+docker run --rm -p 8080:8080 `
+	-e SPRING_PROFILES_ACTIVE=prod `
+	-e DB_URL=<mysql-jdbc-url> `
+	-e DB_USERNAME=<mysql-username> `
+	-e DB_PASSWORD=<mysql-password> `
+	-e JWT_SECRET=<at-least-32-byte-secret> `
+	-e CORS_ALLOWED_ORIGINS=<frontend-origin> `
+	careerlens-backend
+```
+
+Optional backend variables are `JWT_EXPIRATION`, `AI_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_TIMEOUT`. LLM variables are required only when `AI_PROVIDER=llm`. Backend secrets are runtime environment variables; they are not included in the Dockerfile or image source.
+
+Build the frontend image with its API URL supplied at build time:
+
+```powershell
+docker build --build-arg VITE_API_BASE_URL=<backend-api-url> -t careerlens-frontend ./frontend
+```
+
+`VITE_API_BASE_URL` is compiled into the Vite bundle and must be supplied during the frontend image build. The frontend image serves the generated static files through Nginx and supports React route refreshes through SPA fallback. Do not put secrets in frontend build arguments or source control.
+
 ### Production Database Bootstrap
 
 Production uses `spring.jpa.hibernate.ddl-auto=validate`, so a compatible MySQL schema must exist before the backend starts. The deterministic bootstrap schema is [backend/src/main/resources/db/schema.sql](backend/src/main/resources/db/schema.sql). Run it against an empty production database with the MySQL client:
