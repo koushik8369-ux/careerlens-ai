@@ -295,6 +295,10 @@ npm run build
 
 ## Development Progress
 
+### Express Foundation (Stage 2, in progress)
+
+The new Node.js backend foundation lives in `server/`; feature APIs are not migrated yet. Install its dependencies with `npm install`, set `MONGODB_URI` in `server/.env` (local default: `mongodb://localhost:27017/careerlens_db`), then run `npm run dev` from `server/`. The server defaults to port `5000` and currently exposes `GET /api/health`.
+
 - Phase 1 - Authentication: **Complete**
 - Phase 2 - Profile and Dashboard: **Complete**
 - Phase 3 - Resume Analyzer: **Complete**
