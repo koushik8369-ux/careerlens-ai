@@ -1,5 +1,21 @@
 import mongoose from 'mongoose';
 
+const profileSchema = new mongoose.Schema({
+  phone: { type: String, default: null },
+  education: { type: String, default: null },
+  college: { type: String, default: null },
+  graduationYear: { type: Number, default: null },
+  careerGoal: { type: String, default: null },
+  bio: { type: String, default: null },
+  location: { type: String, default: null },
+  skills: { type: [String], default: [] },
+  createdAt: { type: Date, required: true },
+  updatedAt: { type: Date, required: true },
+}, {
+  _id: false,
+  versionKey: false,
+});
+
 const userSchema = new mongoose.Schema({
   fullName: {
     type: String,
@@ -24,6 +40,10 @@ const userSchema = new mongoose.Schema({
     enum: ['USER', 'ADMIN'],
     default: 'USER',
     required: true,
+  },
+  profile: {
+    type: profileSchema,
+    default: undefined,
   },
 }, {
   timestamps: true,
