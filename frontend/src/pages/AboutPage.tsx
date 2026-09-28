@@ -23,7 +23,7 @@ export const AboutPage: React.FC = () => {
             <h2 className="text-base font-semibold text-white">Full-Stack Decoupled Architecture</h2>
           </div>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Built with React, Vite, TypeScript, and Tailwind CSS on the frontend, alongside a robust Java 21 and Spring Boot backend for enterprise-grade scalability.
+            Built with React, Vite, TypeScript, and Tailwind CSS on the frontend, alongside a Node.js and Express API backed by MongoDB.
           </p>
         </div>
 

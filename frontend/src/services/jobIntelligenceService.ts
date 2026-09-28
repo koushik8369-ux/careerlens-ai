@@ -11,7 +11,7 @@ export const getJobHistory = async (): Promise<JobAnalysisResponse[]> => {
   return response.data;
 };
 
-export const getJobAnalysisById = async (id: number): Promise<JobAnalysisResponse> => {
+export const getJobAnalysisById = async (id: string): Promise<JobAnalysisResponse> => {
   const response = await api.get<JobAnalysisResponse>(`/job-intelligence/${id}`);
   return response.data;
 };

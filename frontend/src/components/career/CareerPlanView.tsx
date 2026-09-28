@@ -4,7 +4,7 @@ import type { CareerPlan, CareerPlanCategory, CareerPlanItem } from '../../types
 
 interface CareerPlanViewProps {
   plan: CareerPlan;
-  updatingItemId: number | null;
+  updatingItemId: string | null;
   onToggleItem: (item: CareerPlanItem) => Promise<void>;
 }
 

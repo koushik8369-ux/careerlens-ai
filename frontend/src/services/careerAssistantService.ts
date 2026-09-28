@@ -22,13 +22,13 @@ export const getCareerAssistantConversations = async (): Promise<CareerAssistant
   return response.data;
 };
 
-export const getCareerAssistantMessages = async (conversationId: number): Promise<CareerAssistantMessage[]> => {
+export const getCareerAssistantMessages = async (conversationId: string): Promise<CareerAssistantMessage[]> => {
   const response = await api.get<CareerAssistantMessage[]>(`/career-assistant/conversations/${conversationId}/messages`);
   return response.data;
 };
 
 export const sendCareerAssistantMessage = async (
-  conversationId: number,
+  conversationId: string,
   request: CareerAssistantMessageRequest,
 ): Promise<CareerAssistantMessage> => {
   const response = await api.post<CareerAssistantMessage>(
@@ -73,14 +73,14 @@ export const getCurrentCareerPlan = async (): Promise<CareerPlan> => {
   return response.data;
 };
 
-export const getCareerPlan = async (planId: number): Promise<CareerPlan> => {
+export const getCareerPlan = async (planId: string): Promise<CareerPlan> => {
   const response = await api.get<CareerPlan>(`/career-plans/${planId}`);
   return response.data;
 };
 
 export const updateCareerPlanItem = async (
-  planId: number,
-  itemId: number,
+  planId: string,
+  itemId: string,
   request: CareerPlanItemUpdateRequest,
 ): Promise<CareerPlan> => {
   const response = await api.patch<CareerPlan>(`/career-plans/${planId}/items/${itemId}`, request);

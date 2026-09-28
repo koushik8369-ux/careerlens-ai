@@ -6,7 +6,8 @@ export function notFoundHandler(_request, response, next) {
 
 export function errorHandler(error, _request, response, _next) {
   const candidateStatus = error.status ?? error.statusCode;
-  const status = Number.isInteger(candidateStatus) && candidateStatus >= 400 && candidateStatus < 500
+  const status = Number.isInteger(candidateStatus)
+      && ((candidateStatus >= 400 && candidateStatus < 500) || candidateStatus === 503)
     ? candidateStatus
     : 500;
   const message = error.type === 'entity.parse.failed'
