@@ -50,13 +50,13 @@ CareerLens AI is a Smart Career Intelligence Platform for analyzing career profi
 - Interview Preparation API
 - Career Action Plan API
 - Deterministic AI provider architecture for repeatable career guidance without an external LLM dependency
+- Optional OpenAI-compatible LLM provider with validated local configuration and opt-in smoke testing
 
 The backend resolves the authenticated user from the security context and builds provider input from structured, user-owned career data. The APIs do not require a frontend-supplied `userId`.
 
-## Future and Planned Features
+## Provider Modes
 
-- External LLM provider integration. The current implementation uses the deterministic provider; API keys in the environment example are placeholders only.
-- Additional AI provider implementations can be added behind the existing `CareerAiProvider` contract.
+The deterministic provider is the default and requires no external AI service. An optional OpenAI-compatible LLM provider can be enabled with `AI_PROVIDER=llm`. The provider must expose `/chat/completions`; keep `LLM_API_KEY` only in environment variables or an ignored local `.env` file.
 
 ## Backend API
 
@@ -147,9 +147,10 @@ DB_USERNAME=<mysql-username>
 DB_PASSWORD=<mysql-password>
 JWT_SECRET=<at-least-32-byte-secret>
 JWT_EXPIRATION=86400000
+CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
-The backend loads these values from `backend/.env` or environment variables. Do not commit `.env` or place real credentials in source control. CORS is configured for the local frontend at `http://localhost:5173`.
+The backend loads these values from `backend/.env` or environment variables. Do not commit `.env` or place real credentials in source control. Local development allows `http://localhost:5173` by default; production must set `CORS_ALLOWED_ORIGINS` to explicit frontend origin(s).
 
 ### Local AI Provider Configuration
 
@@ -169,6 +170,74 @@ LLM_TIMEOUT=30s
 ```
 
 `LLM_BASE_URL` must point to a provider exposing an OpenAI-compatible `/chat/completions` endpoint. The LLM provider validates the key, base URL, model, and positive timeout during startup. Keep API keys only in `.env` or environment variables; never commit or print them. The equivalent Spring properties are `app.ai.provider` and `app.ai.llm.*`.
+
+### Production Configuration
+
+Start the backend with the production profile after supplying `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS` through the deployment environment or secret manager:
+
+```powershell
+cd backend
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+```
+
+The production profile validates the existing schema, disables SQL and formatted SQL logging, uses INFO-level application logging, preserves the multipart limits, and requires explicit CORS origins. It does not create or update database schema automatically; apply compatible schema changes separately.
+
+### Container Packaging
+
+The repository includes provider-neutral Docker packaging for the backend and frontend. MySQL remains external; do not put database credentials or other secrets in either image.
+
+Build the backend image from the repository root:
+
+```powershell
+docker build -t careerlens-backend ./backend
+```
+
+Run it with the production runtime variables supplied by the deployment environment or secret manager:
+
+```powershell
+docker run --rm -p 8080:8080 `
+	-e SPRING_PROFILES_ACTIVE=prod `
+	-e DB_URL=<mysql-jdbc-url> `
+	-e DB_USERNAME=<mysql-username> `
+	-e DB_PASSWORD=<mysql-password> `
+	-e JWT_SECRET=<at-least-32-byte-secret> `
+	-e CORS_ALLOWED_ORIGINS=<frontend-origin> `
+	careerlens-backend
+```
+
+Optional backend variables are `JWT_EXPIRATION`, `AI_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_TIMEOUT`. LLM variables are required only when `AI_PROVIDER=llm`. Backend secrets are runtime environment variables; they are not included in the Dockerfile or image source.
+
+Build the frontend image with its API URL supplied at build time:
+
+```powershell
+docker build --build-arg VITE_API_BASE_URL=<backend-api-url> -t careerlens-frontend ./frontend
+```
+
+`VITE_API_BASE_URL` is compiled into the Vite bundle and must be supplied during the frontend image build. The frontend image serves the generated static files through Nginx and supports React route refreshes through SPA fallback. Do not put secrets in frontend build arguments or source control.
+
+### Render Deployment
+
+The repository includes [render.yaml](render.yaml) for the planned provider-neutral Render architecture: an Oregon private MySQL 8 service, an Oregon Docker backend service, and a React static site. Render can create the services from the repository blueprint; do not replace MySQL with PostgreSQL.
+
+1. In Render, create a new Blueprint from `koushik8369-ux/careerlens-ai` and select the `feature/user-profile-dashboard` branch.
+2. Select Oregon for the services. Use the generated Render values for service URLs, private service connection details, and credentials; never copy local `.env` values into the blueprint.
+3. For the MySQL private service, enter values for `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD` in Render. The image copies `backend/src/main/resources/db/schema.sql` into MySQL's first-start initialization directory and does not seed data.
+4. For the backend service, set `DB_URL` to the exact private MySQL JDBC URL provided by the Render database service, and set `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS` as runtime environment variables. Keep `SPRING_PROFILES_ACTIVE=prod` and `AI_PROVIDER=deterministic` unless LLM mode is intentionally configured.
+5. Wait for the backend health check to pass at `/api/health`.
+6. Set the frontend `VITE_API_BASE_URL` to the deployed backend URL ending in `/api`. This is a build-time variable for the static site.
+7. After Render provides the frontend URL, set backend `CORS_ALLOWED_ORIGINS` to that exact frontend origin and redeploy the backend if needed.
+
+The Render blueprint marks secret values as unsynchronized so they must be entered in Render's environment settings. Backend secrets are runtime values; `VITE_API_BASE_URL` is a non-secret frontend build-time value. The production database schema is validated with `ddl-auto=validate`, so the database must initialize successfully before the backend starts.
+
+### Production Database Bootstrap
+
+Production uses `spring.jpa.hibernate.ddl-auto=validate`, so a compatible MySQL schema must exist before the backend starts. The deterministic bootstrap schema is [backend/src/main/resources/db/schema.sql](backend/src/main/resources/db/schema.sql). Run it against an empty production database with the MySQL client:
+
+```powershell
+mysql -u <username> -p <database_name> < backend/src/main/resources/db/schema.sql
+```
+
+Local development continues to use the existing `ddl-auto=update` configuration and does not require this bootstrap step.
 
 ### Run the Backend
 
@@ -225,6 +294,10 @@ npm run build
 ```
 
 ## Development Progress
+
+### Express Foundation (Stage 2, in progress)
+
+The new Node.js backend foundation lives in `server/`; feature APIs are not migrated yet. Install its dependencies with `npm install`, set `MONGODB_URI` in `server/.env` (local default: `mongodb://localhost:27017/careerlens_db`), then run `npm run dev` from `server/`. The server defaults to port `5000` and currently exposes `GET /api/health`.
 
 - Phase 1 - Authentication: **Complete**
 - Phase 2 - Profile and Dashboard: **Complete**

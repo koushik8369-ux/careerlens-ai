@@ -32,6 +32,11 @@ public class LlmCareerAiProvider implements CareerAiProvider {
     private final CareerAiPromptBuilder promptBuilder;
     private final LlmProperties properties;
 
+    @Override
+    public String providerName() {
+        return "llm";
+    }
+
     public LlmCareerAiProvider(
             RestClient.Builder restClientBuilder,
             ObjectMapper objectMapper,

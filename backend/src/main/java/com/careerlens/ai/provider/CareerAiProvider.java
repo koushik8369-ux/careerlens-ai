@@ -10,6 +10,10 @@ import com.careerlens.ai.provider.contracts.ResumeImprovementResult;
 
 public interface CareerAiProvider {
 
+    default String providerName() {
+        return "deterministic";
+    }
+
     CareerAssistantAnswer answerCareerQuestion(UserCareerContext context, String question);
 
     CareerActionPlanResult generateActionPlan(UserCareerContext context);
