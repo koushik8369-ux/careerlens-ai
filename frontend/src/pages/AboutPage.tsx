@@ -9,9 +9,9 @@ export const AboutPage: React.FC = () => {
         <div className="inline-flex p-3 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
           <Info className="w-6 h-6" />
         </div>
-        <h1 className="text-3xl font-bold text-white">About CareerLens AI</h1>
+        <h1 className="text-3xl font-bold text-white">About JOBFIT AI</h1>
         <p className="text-slate-400 max-w-xl mx-auto text-sm">
-          A dedicated platform built to bridge the gap between academic education and modern industry skill requirements.
+          AI-Powered Job Fit &amp; Career Readiness Platform
         </p>
       </div>
 

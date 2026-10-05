@@ -36,7 +36,7 @@ export const loginUser = async (
 export const getAuthErrorMessage = (error: unknown, fallback: string): string => {
   if (axios.isAxiosError(error)) {
     if (!error.response) {
-      return 'Unable to reach CareerLens. Please check that the backend is running.';
+      return 'Unable to reach JOBFIT AI. Please check that the backend is running.';
     }
     return error.response.data?.message || fallback;
   }

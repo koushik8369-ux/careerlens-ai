@@ -1,6 +1,6 @@
-# CareerLens AI
+# JOBFIT AI
 
-CareerLens AI is a Smart Career Intelligence Platform for analyzing career profiles, resumes, job requirements, skill gaps, and career development actions.
+JOBFIT AI is an AI-powered job fit and career readiness platform that analyzes a user's profile, resume, skills, and target job requirements to identify job fit and career gaps.
 
 ## Active Architecture
 

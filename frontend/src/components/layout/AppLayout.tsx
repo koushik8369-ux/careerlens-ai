@@ -39,7 +39,7 @@ export const AppLayout: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-brand-300 bg-clip-text text-transparent">
-                CareerLens AI
+                JOBFIT AI
               </span>
               <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase -mt-1">
                 Career Intelligence
@@ -116,7 +116,7 @@ export const AppLayout: React.FC = () => {
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-slate-950/60 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4">
-          <p>© {new Date().getFullYear()} CareerLens AI — Smart Career Intelligence Platform Foundation</p>
+          <p>© {new Date().getFullYear()} JOBFIT AI — AI-Powered Job Fit &amp; Career Readiness Platform</p>
         </div>
       </footer>
     </div>
@@ -124,4 +124,3 @@ export const AppLayout: React.FC = () => {
 };
 
 export default AppLayout;
-

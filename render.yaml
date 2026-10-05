@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: careerlens-api
+    name: jobfit-ai-api
     runtime: node
     region: oregon
     rootDir: server
@@ -28,7 +28,7 @@ services:
         value: 30s
 
   - type: web
-    name: careerlens-frontend
+    name: jobfit-ai-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
