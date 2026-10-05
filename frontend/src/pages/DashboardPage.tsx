@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AlertCircle, Award, BookOpen, LayoutDashboard, Loader2, Target, UserCircle2 } from 'lucide-react';
 import { getAuthErrorMessage } from '../services/authService';
 import { getDashboard } from '../services/api';
@@ -56,6 +57,26 @@ export const DashboardPage: React.FC = () => {
           <span>{dashboard.profileStatus.replace('_', ' ')}</span>
         </div>
       </div>
+
+      <section className="glass-card p-6 sm:p-8 border border-brand-500/25 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 shrink-0 rounded-xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-center text-brand-300">
+            <Target className="w-6 h-6" aria-hidden="true" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-white">Check Your Job Fit</h2>
+            <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
+              Upload your resume and compare it with a job description to find out how well you match the role.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/job-intelligence"
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-sm transition-colors shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300"
+        >
+          Analyze My Job Fit <span aria-hidden="true">→</span>
+        </Link>
+      </section>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="glass-card p-5 space-y-2">
