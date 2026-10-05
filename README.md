@@ -1,306 +1,107 @@
-# CareerLens AI
+# JOBFIT AI
 
-CareerLens AI is a Smart Career Intelligence Platform for analyzing career profiles, resumes, job requirements, skill gaps, and career development actions.
+JOBFIT AI is an AI-powered job fit and career readiness platform that analyzes a user's profile, resume, skills, and target job requirements to identify job fit and career gaps.
 
-## Technology Stack
+## Active Architecture
 
-### Frontend
+```text
+React 18 + TypeScript + Vite
+          ↓ REST / JWT
+Node.js + Express.js
+          ↓ Mongoose
+MongoDB
+```
 
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- React Router
-- Axios
+The active API is in `server/`. The original Spring Boot/MySQL implementation in `backend/` is retained as a migration reference and is not used by the active frontend or Render blueprint. Existing MySQL records are not automatically imported into MongoDB; keep the old database available until a separate data-transfer plan is completed.
 
-### Backend
+## Features
 
-- Java 21
-- Spring Boot 3.3.4
-- Apache Maven
-- Spring Data JPA
-- Apache Tika for document text extraction
-
-### Data and Security
-
-- MySQL for runtime persistence
-- Spring Security
-- BCrypt password hashing
-- JWT authentication with stateless protected APIs
-- H2 in-memory database for backend tests
-
-### Testing
-
-- JUnit
-- Mockito
-- Spring Boot Test
-- Spring MockMvc
-
-## Implemented Features
-
-- Authentication: registration, login, BCrypt password hashing, JWT authentication, and protected APIs
+- Registration, login, bcrypt password hashing, JWT authentication, and protected routes
 - User profile and dashboard
-- Resume Analyzer with file upload, structured analysis, and history
-- Job and Career Intelligence with job analysis and history
-- Career Assistant conversations and chat
-- Career Plan generation, retrieval, and task completion
-- Resume Improvement API
-- Skill Roadmap API
-- Project Recommendations API
-- Interview Preparation API
-- Career Action Plan API
-- Deterministic AI provider architecture for repeatable career guidance without an external LLM dependency
-- Optional OpenAI-compatible LLM provider with validated local configuration and opt-in smoke testing
+- Resume Analyzer: PDF, DOCX, DOC, and TXT uploads; deterministic scoring, role matching, and history
+- Job Intelligence: deterministic job description analysis, skill matching, recommendations, and history
+- Career Assistant conversations and deterministic responses
+- Resume improvement, skill roadmap, project recommendations, interview preparation, and action plan
+- Career plan generation, retrieval, ordered task completion, and archival of the previous active plan
+- Optional OpenAI-compatible career AI provider; deterministic behavior is the default
 
-The backend resolves the authenticated user from the security context and builds provider input from structured, user-owned career data. The APIs do not require a frontend-supplied `userId`.
+All user-owned data is scoped to the authenticated JWT identity. The React application calls Express only; MongoDB credentials remain server-side.
 
-## Provider Modes
+## API
 
-The deterministic provider is the default and requires no external AI service. An optional OpenAI-compatible LLM provider can be enabled with `AI_PROVIDER=llm`. The provider must expose `/chat/completions`; keep `LLM_API_KEY` only in environment variables or an ignored local `.env` file.
+All endpoints use the `/api` prefix. Health, registration, and login are public; all other routes require `Authorization: Bearer <token>`.
 
-## Backend API
+| Method | Endpoint |
+| --- | --- |
+| GET | `/api/health` |
+| POST | `/api/auth/register` |
+| POST | `/api/auth/login` |
+| GET | `/api/auth/me` |
+| GET, PUT | `/api/profile` |
+| GET | `/api/dashboard` |
+| POST | `/api/resume/analyze` |
+| GET | `/api/resume/history` |
+| GET | `/api/resume/:id` |
+| POST | `/api/job-intelligence/analyze` |
+| GET | `/api/job-intelligence/history` |
+| GET | `/api/job-intelligence/:id` |
+| POST, GET | `/api/career-assistant/conversations` |
+| GET, POST | `/api/career-assistant/conversations/:conversationId/messages` |
+| POST | `/api/career-assistant/action-plan` |
+| POST | `/api/career-assistant/resume-improvement` |
+| POST | `/api/career-assistant/roadmap` |
+| POST | `/api/career-assistant/projects` |
+| POST | `/api/career-assistant/interview-preparation` |
+| POST | `/api/career-plans` |
+| GET | `/api/career-plans/current` |
+| GET | `/api/career-plans/:id` |
+| PATCH | `/api/career-plans/:id/items/:itemId` |
 
-All endpoints require JWT authentication unless marked **Public**. The backend runs under `/api`.
+Resume analysis accepts multipart form data with a required `file` and optional `targetRole`. Supported types are PDF, DOCX, DOC, and TXT; uploads are limited to 10 MB and processed in memory.
 
-| Area | Method | Endpoint | Access |
-| --- | --- | --- | --- |
-| Health | GET | `/api/health` | Public |
-| Authentication | POST | `/api/auth/register` | Public |
-| Authentication | POST | `/api/auth/login` | Public |
-| Authentication | GET | `/api/auth/me` | Authenticated |
-| Profile | GET | `/api/profile` | Authenticated |
-| Profile | PUT | `/api/profile` | Authenticated |
-| Dashboard | GET | `/api/dashboard` | Authenticated |
-| Resume Analyzer | POST | `/api/resume/analyze` | Authenticated |
-| Resume Analyzer | GET | `/api/resume/history` | Authenticated |
-| Resume Analyzer | GET | `/api/resume/{id}` | Authenticated |
-| Job Intelligence | POST | `/api/job-intelligence/analyze` | Authenticated |
-| Job Intelligence | GET | `/api/job-intelligence/history` | Authenticated |
-| Job Intelligence | GET | `/api/job-intelligence/{id}` | Authenticated |
-| Career Conversations | POST | `/api/career-assistant/conversations` | Authenticated |
-| Career Conversations | GET | `/api/career-assistant/conversations` | Authenticated |
-| Career Conversations | GET | `/api/career-assistant/conversations/{conversationId}/messages` | Authenticated |
-| Career Conversations | POST | `/api/career-assistant/conversations/{conversationId}/messages` | Authenticated |
-| Resume Improvement | POST | `/api/career-assistant/resume-improvement` | Authenticated |
-| Skill Roadmap | POST | `/api/career-assistant/roadmap` | Authenticated |
-| Project Recommendations | POST | `/api/career-assistant/projects` | Authenticated |
-| Interview Preparation | POST | `/api/career-assistant/interview-preparation` | Authenticated |
-| Career Action Plan | POST | `/api/career-assistant/action-plan` | Authenticated |
-| Career Plan | POST | `/api/career-plans` | Authenticated |
-| Career Plan | GET | `/api/career-plans/current` | Authenticated |
-| Career Plan | GET | `/api/career-plans/{id}` | Authenticated |
-| Career Plan | PATCH | `/api/career-plans/{id}/items/{itemId}` | Authenticated |
+MongoDB collections are `users`, `resumeanalyses`, `jobanalyses`, `careerassistantconversations`, `careerassistantmessages`, and `careerplans`. Profile data is embedded in `users`; career-plan items are embedded in their plan. ObjectId API values are strings.
 
-## Project Structure
+## Local Development
 
-```text
-careerlens-ai/
-├── backend/
-│   ├── src/main/java/com/careerlens/
-│   │   ├── config/       # Security, CORS, and application configuration
-│   │   ├── controller/   # REST controllers
-│   │   ├── dto/          # Request and response types
-│   │   ├── entity/       # JPA entities
-│   │   ├── exception/    # API exception handling
-│   │   ├── repository/   # Spring Data repositories
-│   │   ├── security/     # JWT services and authentication filter
-│   │   └── service/      # Application and domain services
-│   ├── src/main/resources/application.properties
-│   ├── src/test/java/com/careerlens/
-│   ├── src/test/resources/application.properties
-│   ├── .env.example
-│   └── pom.xml
-├── frontend/
-│   ├── src/
-│   │   ├── assets/
-│   │   ├── components/
-│   │   ├── context/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   ├── types/
-│   │   └── utils/
-│   ├── public/
-│   ├── .env.example
-│   └── package.json
-└── README.md
-```
+Requirements: Node.js 22.3 or newer, npm, and a local MongoDB instance or MongoDB Atlas URI.
 
-## Setup
-
-### Prerequisites
-
-- JDK 21
-- Apache Maven 3.8 or newer
-- Node.js and npm
-- MySQL 8 or a compatible MySQL server
-
-### MySQL and Backend Configuration
-
-Create or make available a MySQL database for CareerLens. The default JDBC URL creates `careerlens_db` when the MySQL user has permission to do so.
-
-From `backend/`, copy `.env.example` to `.env` and set values appropriate for the local environment:
-
-```properties
-DB_URL=jdbc:mysql://localhost:3306/careerlens_db
-DB_USERNAME=<mysql-username>
-DB_PASSWORD=<mysql-password>
-JWT_SECRET=<at-least-32-byte-secret>
-JWT_EXPIRATION=86400000
-CORS_ALLOWED_ORIGINS=http://localhost:5173
-```
-
-The backend loads these values from `backend/.env` or environment variables. Do not commit `.env` or place real credentials in source control. Local development allows `http://localhost:5173` by default; production must set `CORS_ALLOWED_ORIGINS` to explicit frontend origin(s).
-
-### Local AI Provider Configuration
-
-The backend uses deterministic career guidance by default, so it starts without LLM credentials:
-
-```properties
-AI_PROVIDER=deterministic
-```
-
-To use a real OpenAI-compatible provider locally, set `AI_PROVIDER=llm` and provide these values in `backend/.env` or the process environment:
-
-```properties
-LLM_API_KEY=<provider-key>
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4o-mini
-LLM_TIMEOUT=30s
-```
-
-`LLM_BASE_URL` must point to a provider exposing an OpenAI-compatible `/chat/completions` endpoint. The LLM provider validates the key, base URL, model, and positive timeout during startup. Keep API keys only in `.env` or environment variables; never commit or print them. The equivalent Spring properties are `app.ai.provider` and `app.ai.llm.*`.
-
-### Production Configuration
-
-Start the backend with the production profile after supplying `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS` through the deployment environment or secret manager:
+From `server/`, install dependencies and create a local environment file from the example. Set `MONGODB_URI` to your development database and `JWT_SECRET` to a private random value of at least 32 UTF-8 bytes. Do not commit `.env` files.
 
 ```powershell
-cd backend
-mvn spring-boot:run -Dspring-boot.run.profiles=prod
-```
-
-The production profile validates the existing schema, disables SQL and formatted SQL logging, uses INFO-level application logging, preserves the multipart limits, and requires explicit CORS origins. It does not create or update database schema automatically; apply compatible schema changes separately.
-
-### Container Packaging
-
-The repository includes provider-neutral Docker packaging for the backend and frontend. MySQL remains external; do not put database credentials or other secrets in either image.
-
-Build the backend image from the repository root:
-
-```powershell
-docker build -t careerlens-backend ./backend
-```
-
-Run it with the production runtime variables supplied by the deployment environment or secret manager:
-
-```powershell
-docker run --rm -p 8080:8080 `
-	-e SPRING_PROFILES_ACTIVE=prod `
-	-e DB_URL=<mysql-jdbc-url> `
-	-e DB_USERNAME=<mysql-username> `
-	-e DB_PASSWORD=<mysql-password> `
-	-e JWT_SECRET=<at-least-32-byte-secret> `
-	-e CORS_ALLOWED_ORIGINS=<frontend-origin> `
-	careerlens-backend
-```
-
-Optional backend variables are `JWT_EXPIRATION`, `AI_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_TIMEOUT`. LLM variables are required only when `AI_PROVIDER=llm`. Backend secrets are runtime environment variables; they are not included in the Dockerfile or image source.
-
-Build the frontend image with its API URL supplied at build time:
-
-```powershell
-docker build --build-arg VITE_API_BASE_URL=<backend-api-url> -t careerlens-frontend ./frontend
-```
-
-`VITE_API_BASE_URL` is compiled into the Vite bundle and must be supplied during the frontend image build. The frontend image serves the generated static files through Nginx and supports React route refreshes through SPA fallback. Do not put secrets in frontend build arguments or source control.
-
-### Render Deployment
-
-The repository includes [render.yaml](render.yaml) for the planned provider-neutral Render architecture: an Oregon private MySQL 8 service, an Oregon Docker backend service, and a React static site. Render can create the services from the repository blueprint; do not replace MySQL with PostgreSQL.
-
-1. In Render, create a new Blueprint from `koushik8369-ux/careerlens-ai` and select the `feature/user-profile-dashboard` branch.
-2. Select Oregon for the services. Use the generated Render values for service URLs, private service connection details, and credentials; never copy local `.env` values into the blueprint.
-3. For the MySQL private service, enter values for `MYSQL_PASSWORD` and `MYSQL_ROOT_PASSWORD` in Render. The image copies `backend/src/main/resources/db/schema.sql` into MySQL's first-start initialization directory and does not seed data.
-4. For the backend service, set `DB_URL` to the exact private MySQL JDBC URL provided by the Render database service, and set `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS` as runtime environment variables. Keep `SPRING_PROFILES_ACTIVE=prod` and `AI_PROVIDER=deterministic` unless LLM mode is intentionally configured.
-5. Wait for the backend health check to pass at `/api/health`.
-6. Set the frontend `VITE_API_BASE_URL` to the deployed backend URL ending in `/api`. This is a build-time variable for the static site.
-7. After Render provides the frontend URL, set backend `CORS_ALLOWED_ORIGINS` to that exact frontend origin and redeploy the backend if needed.
-
-The Render blueprint marks secret values as unsynchronized so they must be entered in Render's environment settings. Backend secrets are runtime values; `VITE_API_BASE_URL` is a non-secret frontend build-time value. The production database schema is validated with `ddl-auto=validate`, so the database must initialize successfully before the backend starts.
-
-### Production Database Bootstrap
-
-Production uses `spring.jpa.hibernate.ddl-auto=validate`, so a compatible MySQL schema must exist before the backend starts. The deterministic bootstrap schema is [backend/src/main/resources/db/schema.sql](backend/src/main/resources/db/schema.sql). Run it against an empty production database with the MySQL client:
-
-```powershell
-mysql -u <username> -p <database_name> < backend/src/main/resources/db/schema.sql
-```
-
-Local development continues to use the existing `ddl-auto=update` configuration and does not require this bootstrap step.
-
-### Run the Backend
-
-```powershell
-cd backend
-mvn spring-boot:run
-```
-
-The backend is available at `http://localhost:8080`. The public health check is:
-
-```text
-GET http://localhost:8080/api/health
-```
-
-### Run the Frontend
-
-From `frontend/`, copy `.env.example` to `.env` if needed and set the API base URL:
-
-```properties
-VITE_API_BASE_URL=http://localhost:8080/api
-```
-
-Then install dependencies and start Vite:
-
-```powershell
-cd frontend
+cd server
 npm install
 npm run dev
 ```
 
-The frontend is available at `http://localhost:5173`.
+The API defaults to `http://localhost:5000`. The frontend defaults to `http://localhost:5173`; Vite proxies development `/api` calls to Express on port `5000`. Production builds use the configured `VITE_API_BASE_URL`, whose example points to `http://localhost:5000/api`.
 
-## Testing
-
-Run backend tests from `backend/`:
+Run the frontend in another terminal:
 
 ```powershell
-mvn clean test
+cd frontend
+npm ci
+npm run dev
 ```
 
-Normal tests are completely offline. An optional real-provider smoke test is skipped unless explicitly enabled and all LLM environment variables are present:
+## AI Provider
+
+`AI_PROVIDER=deterministic` is the default and requires no external AI service. To enable the optional OpenAI-compatible provider, set `AI_PROVIDER=llm` and configure `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_TIMEOUT` as server-side environment variables. The provider calls `/chat/completions`, validates structured JSON results, and does not expose upstream response bodies. Tests use mocked fetch and never call an external LLM.
+
+## Deployment
+
+`render.yaml` defines a Node web service and React static site. It does not create a database. Configure `MONGODB_URI` with an externally managed MongoDB deployment (for example, Atlas), set an explicit `CORS_ALLOWED_ORIGINS` frontend origin, and provide the generated `JWT_SECRET` through Render. `VITE_API_BASE_URL` is a frontend build-time setting that must point to the deployed Express API and end in `/api`.
+
+The Node service starts with `npm start`, binds to `0.0.0.0`, and uses Render's `PORT`. The frontend is built with `npm ci && npm run build` and publishes `dist`.
+
+## Validation
+
+Run the database-free backend suite and frontend production build:
 
 ```powershell
-$env:CAREERLENS_LLM_SMOKE_TEST="true"
-mvn test
+npm --prefix server install
+npm --prefix server test
+npm --prefix frontend ci
+npm --prefix frontend run build
 ```
 
-The smoke test makes one real chat request, verifies that the response maps to `CareerAssistantAnswer`, and reports only safe generic diagnostics. Unset `CAREERLENS_LLM_SMOKE_TEST` after the check. A Maven property can also enable it with `mvn -Dllm.smoke.test=true test`.
-
-Build the frontend from `frontend/`:
-
-```powershell
-npm run build
-```
-
-## Development Progress
-
-### Express Foundation (Stage 2, in progress)
-
-The new Node.js backend foundation lives in `server/`; feature APIs are not migrated yet. Install its dependencies with `npm install`, set `MONGODB_URI` in `server/.env` (local default: `mongodb://localhost:27017/careerlens_db`), then run `npm run dev` from `server/`. The server defaults to port `5000` and currently exposes `GET /api/health`.
-
-- Phase 1 - Authentication: **Complete**
-- Phase 2 - Profile and Dashboard: **Complete**
-- Phase 3 - Resume Analyzer: **Complete**
-- Phase 4 - Job and Career Intelligence: **Complete**
-- Phase 5 - Career AI foundation and Career Assistant: **Complete**
+Backend tests use injected fake models and mocked LLM calls; they do not require a running MongoDB service or production credentials.

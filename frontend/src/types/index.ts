@@ -21,7 +21,7 @@ export interface RegisterRequest {
 }
 
 export interface LoginResponse {
-  id: number;
+  id: string;
   fullName: string;
   email: string;
   role: 'USER' | 'ADMIN';
@@ -30,7 +30,7 @@ export interface LoginResponse {
 }
 
 export interface User {
-  id: number;
+  id: string;
   fullName: string;
   email: string;
   role: 'USER' | 'ADMIN';
@@ -61,7 +61,7 @@ export interface UserProfileRequest {
 }
 
 export interface UserProfileResponse extends UserProfileRequest {
-  userId: number;
+  userId: string;
   fullName: string;
   email: string;
   createdAt: string;
@@ -69,7 +69,7 @@ export interface UserProfileResponse extends UserProfileRequest {
 }
 
 export interface DashboardResponse {
-  userId: number;
+  userId: string;
   fullName: string;
   email: string;
   careerGoal: string | null;
@@ -83,7 +83,7 @@ export interface DashboardResponse {
 export type AuthResponse = LoginResponse;
 
 export interface ResumeAnalysisResponse {
-  id: number;
+  id: string;
   fileName: string;
   fileType: string;
   overallScore: number;
@@ -131,7 +131,7 @@ export interface InterviewQuestion {
 }
 
 export interface JobAnalysisResponse {
-  id: number;
+  id: string;
   jobTitle: string;
   companyName: string;
   rawJobDescription: string;
@@ -151,7 +151,7 @@ export interface JobAnalysisResponse {
 // ── Phase 5: Career Assistant & Career Plan ────────────────────────────────
 
 export interface CareerAssistantConversation {
-  id: number;
+  id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
@@ -160,7 +160,7 @@ export interface CareerAssistantConversation {
 export type CareerAssistantMessageRole = 'USER' | 'ASSISTANT';
 
 export interface CareerAssistantMessage {
-  id: number;
+  id: string;
   role: CareerAssistantMessageRole;
   content: string;
   provider: string | null;
@@ -216,7 +216,7 @@ export type CareerPlanCategory = 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM';
 export type CareerPlanItemType = 'LEARNING' | 'PROJECT' | 'INTERVIEW' | 'RESUME';
 
 export interface CareerPlanItem {
-  id: number;
+  id: string;
   category: CareerPlanCategory;
   itemType: CareerPlanItemType;
   title: string;
@@ -228,9 +228,9 @@ export interface CareerPlanItem {
 }
 
 export interface CareerPlan {
-  id: number;
-  sourceResumeAnalysisId: number | null;
-  sourceJobAnalysisId: number | null;
+  id: string;
+  sourceResumeAnalysisId: string | null;
+  sourceJobAnalysisId: string | null;
   careerGoal: string | null;
   status: CareerPlanStatus;
   createdAt: string;

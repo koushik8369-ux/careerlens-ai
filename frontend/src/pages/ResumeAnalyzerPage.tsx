@@ -62,7 +62,7 @@ export const ResumeAnalyzerPage: React.FC = () => {
             Resume Analyzer
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Scan your resume against ATS criteria and target job roles with CareerLens AI.
+            Scan your resume against ATS criteria and target job roles with JOBFIT AI.
           </p>
         </div>
 

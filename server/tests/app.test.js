@@ -17,7 +17,7 @@ describe('Express foundation', () => {
 
     assert.equal(response.status, 200);
     assert.deepEqual(response.body, {
-      message: 'CareerLens AI backend is running',
+      message: 'JOBFIT AI backend is running',
       status: 'ok',
       database: 'disconnected',
     });

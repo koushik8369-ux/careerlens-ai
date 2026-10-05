@@ -6,8 +6,17 @@ import { createAuthRoutes } from './routes/authRoutes.js';
 import { createDashboardRoutes } from './routes/dashboardRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import { createProfileRoutes } from './routes/profileRoutes.js';
+import { createResumeRoutes } from './routes/resumeRoutes.js';
+import { createJobIntelligenceRoutes } from './routes/jobIntelligenceRoutes.js';
+import { createCareerAssistantRoutes } from './routes/careerAssistantRoutes.js';
+import { createCareerPlanRoutes } from './routes/careerPlanRoutes.js';
 
-export function createApp({ authDependencies } = {}) {
+export function createApp({
+	authDependencies,
+	resumeDependencies = authDependencies,
+	jobDependencies = authDependencies,
+	careerDependencies = authDependencies,
+} = {}) {
 	const app = express();
 
 	app.use(cors(createCorsOptions()));
@@ -16,6 +25,10 @@ export function createApp({ authDependencies } = {}) {
 	app.use('/api/auth', createAuthRoutes(authDependencies));
 	app.use('/api/profile', createProfileRoutes(authDependencies));
 	app.use('/api/dashboard', createDashboardRoutes(authDependencies));
+	app.use('/api/resume', createResumeRoutes(resumeDependencies));
+	app.use('/api/job-intelligence', createJobIntelligenceRoutes(jobDependencies));
+	app.use('/api/career-assistant', createCareerAssistantRoutes(careerDependencies));
+	app.use('/api/career-plans', createCareerPlanRoutes(careerDependencies));
 	app.use(notFoundHandler);
 	app.use(errorHandler);
 

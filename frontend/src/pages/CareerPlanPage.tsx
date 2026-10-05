@@ -17,7 +17,7 @@ export const CareerPlanPage: React.FC = () => {
   const [plan, setPlan] = useState<CareerPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [updatingItemId, setUpdatingItemId] = useState<number | null>(null);
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

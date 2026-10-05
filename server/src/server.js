@@ -13,7 +13,7 @@ try {
   validateJwtConfiguration();
   await connectDatabase();
   app.listen(port, '0.0.0.0', () => {
-    console.info(`CareerLens AI server listening on 0.0.0.0:${port}.`);
+    console.info(`JOBFIT AI server listening on 0.0.0.0:${port}.`);
   });
 } catch (error) {
   console.error(error.message);

@@ -9,9 +9,9 @@ export const AboutPage: React.FC = () => {
         <div className="inline-flex p-3 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
           <Info className="w-6 h-6" />
         </div>
-        <h1 className="text-3xl font-bold text-white">About CareerLens AI</h1>
+        <h1 className="text-3xl font-bold text-white">About JOBFIT AI</h1>
         <p className="text-slate-400 max-w-xl mx-auto text-sm">
-          A dedicated platform built to bridge the gap between academic education and modern industry skill requirements.
+          AI-Powered Job Fit &amp; Career Readiness Platform
         </p>
       </div>
 
@@ -23,7 +23,7 @@ export const AboutPage: React.FC = () => {
             <h2 className="text-base font-semibold text-white">Full-Stack Decoupled Architecture</h2>
           </div>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Built with React, Vite, TypeScript, and Tailwind CSS on the frontend, alongside a robust Java 21 and Spring Boot backend for enterprise-grade scalability.
+            Built with React, Vite, TypeScript, and Tailwind CSS on the frontend, alongside a Node.js and Express API backed by MongoDB.
           </p>
         </div>
 

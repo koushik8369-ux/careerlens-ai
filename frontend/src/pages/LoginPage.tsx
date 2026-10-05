@@ -61,7 +61,7 @@ export const LoginPage: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-white via-slate-200 to-brand-300 bg-clip-text text-transparent">
-                CareerLens AI
+                JOBFIT AI
               </span>
               <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase -mt-0.5">
                 Career Intelligence

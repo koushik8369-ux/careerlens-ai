@@ -24,7 +24,7 @@ export const getResumeHistory = async (): Promise<ResumeAnalysisResponse[]> => {
   return response.data;
 };
 
-export const getResumeAnalysisById = async (id: number): Promise<ResumeAnalysisResponse> => {
+export const getResumeAnalysisById = async (id: string): Promise<ResumeAnalysisResponse> => {
   const response = await api.get<ResumeAnalysisResponse>(`/resume/${id}`);
   return response.data;
 };

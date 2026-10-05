@@ -38,7 +38,7 @@ export const HomePage: React.FC = () => {
         </h1>
 
         <p className="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          CareerLens AI helps students analyze skills, identify critical industry gaps, track learning milestones, and unlock personalized career recommendations.
+          JOBFIT AI helps students analyze skills, identify critical industry gaps, track learning milestones, and unlock personalized career recommendations.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">

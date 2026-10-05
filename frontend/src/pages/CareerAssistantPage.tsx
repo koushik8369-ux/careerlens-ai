@@ -103,7 +103,7 @@ export const CareerAssistantPage: React.FC = () => {
       const assistantMessage = await sendCareerAssistantMessage(selected.id, { question });
       setMessages((current) => [
         ...current,
-        { id: Date.now(), role: 'USER', content: question, provider: null, createdAt: new Date().toISOString() },
+        { id: Date.now().toString(), role: 'USER', content: question, provider: null, createdAt: new Date().toISOString() },
         assistantMessage,
       ]);
       await loadConversations();
