@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { analyzeJob, getJobHistory } from '../services/jobIntelligenceService';
+import { analyzeResume } from '../services/resumeService';
 import type {
   JobAnalysisRequest,
   JobAnalysisResponse,
+  ResumeAnalysisResponse,
   SkillGap,
   CareerRecommendation,
   InterviewQuestion,
@@ -25,6 +27,9 @@ import {
   TrendingUp,
   Brain,
   RotateCcw,
+  UploadCloud,
+  FileText,
+  X,
 } from 'lucide-react';
 
 // ── Score Ring ───────────────────────────────────────────────────────────────
@@ -122,13 +127,33 @@ const QIcon: React.FC<{ category: string }> = ({ category }) => {
   return <TrendingUp className="w-4 h-4 text-emerald-400" />;
 };
 
+const getSkillOverlap = (resumeSkills: string[], jobSkills: string[]) => {
+  const normalizedResumeSkills = new Set(
+    resumeSkills.map((skill) => skill.trim().toLocaleLowerCase()),
+  );
+  return jobSkills.filter((skill) => normalizedResumeSkills.has(skill.trim().toLocaleLowerCase()));
+};
+
 // ── Analysis Result View ──────────────────────────────────────────────────────
 
-const AnalysisResultView: React.FC<{ result: JobAnalysisResponse; onReset: () => void }> = ({
-  result,
-  onReset,
-}) => {
+const AnalysisResultView: React.FC<{
+  result: JobAnalysisResponse;
+  resumeAnalysis?: ResumeAnalysisResponse;
+  onReset: () => void;
+}> = ({ result, resumeAnalysis, onReset }) => {
   const [openQuestionIdx, setOpenQuestionIdx] = useState<number | null>(null);
+  const requiredSkills = [...new Set(result.requiredSkills)];
+  const preferredSkills = [...new Set(result.preferredSkills)];
+  const matchedRequiredSkills = resumeAnalysis
+    ? getSkillOverlap(resumeAnalysis.detectedSkills, requiredSkills)
+    : [];
+  const missingRequiredSkills = requiredSkills.filter((skill) => !matchedRequiredSkills.includes(skill));
+  const matchedPreferredSkills = resumeAnalysis
+    ? getSkillOverlap(resumeAnalysis.detectedSkills, preferredSkills)
+    : [];
+  const resumeFitScore = requiredSkills.length > 0
+    ? Math.round((matchedRequiredSkills.length / requiredSkills.length) * 100)
+    : null;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -156,7 +181,89 @@ const AnalysisResultView: React.FC<{ result: JobAnalysisResponse; onReset: () =>
         </button>
       </div>
 
+      {resumeAnalysis && (
+        <section className="glass-card p-6 sm:p-8 border border-brand-500/25 space-y-6" aria-labelledby="resume-fit-heading">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">Resume + Job Description</p>
+              <h3 id="resume-fit-heading" className="text-xl sm:text-2xl font-bold text-white mt-2">Your Job Fit Score</h3>
+              {resumeFitScore === null ? (
+                <p className="text-sm text-slate-400 mt-2">
+                  No required skills were identified in this job description, so a resume fit score is unavailable.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-300 mt-2">
+                    {matchedRequiredSkills.length} of {requiredSkills.length} required skills detected in {resumeAnalysis.fileName}.
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Based on exact skill-name overlap between the analyzed resume and job requirements.
+                  </p>
+                </>
+              )}
+            </div>
+            {resumeFitScore !== null && (
+              <div className="shrink-0 text-left sm:text-right">
+                <span className="text-4xl font-extrabold" style={{ color: scoreColor(resumeFitScore) }}>
+                  {resumeFitScore}%
+                </span>
+                <div
+                  className="mt-2 h-2 w-40 overflow-hidden rounded-full bg-slate-800"
+                  role="progressbar"
+                  aria-label="Required skills detected in resume"
+                  aria-valuenow={resumeFitScore}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div className="h-full rounded-full bg-brand-400" style={{ width: `${resumeFitScore}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {matchedRequiredSkills.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-slate-200">Matching Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {matchedRequiredSkills.map((skill) => <SkillChip key={skill} name={skill} type="matched" />)}
+              </div>
+            </div>
+          )}
+
+          {missingRequiredSkills.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-slate-200">Missing Required Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {missingRequiredSkills.map((skill) => <SkillChip key={skill} name={skill} type="missing" />)}
+              </div>
+            </div>
+          )}
+
+          {preferredSkills.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-slate-200">
+                Preferred Skills <span className="text-xs font-normal text-slate-500">({matchedPreferredSkills.length} detected)</span>
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {preferredSkills.map((skill) => (
+                  <SkillChip
+                    key={skill}
+                    name={skill}
+                    type={matchedPreferredSkills.includes(skill) ? 'matched' : 'preferred'}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Score Cards */}
+      {resumeAnalysis && (
+        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wide">
+          Additional Profile-Based Job Analysis
+        </h3>
+      )}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col items-center gap-2">
           <ScoreRing score={result.overallMatchScore} label="Overall Match" />
@@ -171,7 +278,9 @@ const AnalysisResultView: React.FC<{ result: JobAnalysisResponse; onReset: () =>
 
       {/* Skills Overview */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wide">Skill Overview</h3>
+        <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wide">
+          {resumeAnalysis ? 'Profile Skill Overview' : 'Skill Overview'}
+        </h3>
         {result.matchedSkills.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-500">✅ Matched</p>
@@ -282,102 +391,230 @@ const AnalysisResultView: React.FC<{ result: JobAnalysisResponse; onReset: () =>
   );
 };
 
-// ── JD Input Form ─────────────────────────────────────────────────────────────
+// ── Job Fit Input Form ─────────────────────────────────────────────────────────
 
 const JobDescriptionInput: React.FC<{
-  onAnalyze: (req: JobAnalysisRequest) => void;
+  onAnalyze: (req: JobAnalysisRequest, resumeFile: File) => void;
   isLoading: boolean;
   error: string | null;
 }> = ({ onAnalyze, isLoading, error }) => {
   const [jobTitle, setJobTitle] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [jobDescription, setJobDescription] = useState('');
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const charCount = jobDescription.length;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onAnalyze({ jobTitle: jobTitle.trim() || undefined, companyName: companyName.trim() || undefined, jobDescription });
+    if (!resumeFile) return;
+    onAnalyze(
+      { jobTitle: jobTitle.trim() || undefined, companyName: companyName.trim() || undefined, jobDescription },
+      resumeFile,
+    );
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const lowerName = file.name.toLowerCase();
+    const validType = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'text/plain',
+    ].includes(file.type);
+    const validExtension = ['.pdf', '.docx', '.doc', '.txt'].some((extension) => lowerName.endsWith(extension));
+
+    if (!validType && !validExtension) {
+      setResumeFile(null);
+      setFileError('Choose a PDF, DOCX, DOC, or TXT resume.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setResumeFile(null);
+      setFileError('The resume must be 10 MB or smaller.');
+      e.target.value = '';
+      return;
+    }
+
+    setResumeFile(file);
+    setFileError(null);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 max-w-3xl mx-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide" htmlFor="job-title">
-            Job Title <span className="text-slate-600 normal-case">(optional)</span>
-          </label>
-          <input
-            id="job-title"
-            type="text"
-            value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
-            placeholder="e.g. Senior Backend Engineer"
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/70 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30 transition"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide" htmlFor="company-name">
-            Company <span className="text-slate-600 normal-case">(optional)</span>
-          </label>
-          <input
-            id="company-name"
-            type="text"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            placeholder="e.g. Google, Netflix"
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/70 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30 transition"
-          />
-        </div>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <section className="glass-card p-5 sm:p-6 space-y-5" aria-labelledby="resume-input-title">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-300">
+              <FileText className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-300">Step 01</p>
+              <h2 id="resume-input-title" className="text-lg font-bold text-white mt-0.5">Your Resume</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Upload your latest resume so we can compare your skills and experience with the job.
+              </p>
+            </div>
+          </div>
 
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide" htmlFor="job-description">
-            Job Description <span className="text-red-400">*</span>
-          </label>
-          <span className={`text-xs ${charCount > 18000 ? 'text-red-400' : 'text-slate-500'}`}>
-            {charCount.toLocaleString()} / 20,000
-          </span>
-        </div>
-        <textarea
-          id="job-description"
-          value={jobDescription}
-          onChange={(e) => setJobDescription(e.target.value)}
-          placeholder="Paste the full job description here — include requirements, responsibilities, and qualifications for the most accurate analysis..."
-          rows={14}
-          maxLength={20000}
-          required
-          minLength={30}
-          className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700/70 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30 transition resize-none leading-relaxed font-mono"
-        />
+          <div>
+            <label
+              htmlFor="job-fit-resume"
+              className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-700 bg-slate-950/40 px-4 py-6 text-center transition-colors hover:border-brand-500/60 hover:bg-slate-950/70 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-400"
+            >
+              <UploadCloud className="w-6 h-6 text-brand-400" aria-hidden="true" />
+              <span className="text-sm font-medium text-slate-200">
+                {resumeFile ? resumeFile.name : 'Choose your resume'}
+              </span>
+              <span className="text-xs text-slate-500">PDF, DOCX, DOC, or TXT · Max 10 MB</span>
+              <input
+                ref={fileInputRef}
+                id="job-fit-resume"
+                type="file"
+                accept=".pdf,.docx,.doc,.txt"
+                onChange={handleFileChange}
+                disabled={isLoading}
+                required
+                className="sr-only"
+                aria-describedby={fileError ? 'resume-file-error' : 'resume-file-help'}
+              />
+            </label>
+            <p id="resume-file-help" className="sr-only">Select a PDF, DOCX, DOC, or TXT resume up to 10 MB.</p>
+            {fileError && (
+              <p id="resume-file-error" role="alert" className="text-xs text-red-300 mt-2">{fileError}</p>
+            )}
+            {resumeFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  setResumeFile(null);
+                  setFileError(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium text-slate-400 hover:text-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
+                disabled={isLoading}
+                aria-label="Remove selected resume"
+              >
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+                Remove resume
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="glass-card p-5 sm:p-6 space-y-5" aria-labelledby="job-description-title">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-300">
+              <Briefcase className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-300">Step 02</p>
+              <h2 id="job-description-title" className="text-lg font-bold text-white mt-0.5">Job Description</h2>
+              <p className="text-sm text-slate-400 mt-1">
+                Paste the complete job description, including responsibilities and requirements.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide" htmlFor="job-description">
+                Job Description <span className="text-red-400" aria-hidden="true">*</span>
+              </label>
+              <span className={`text-xs ${charCount > 18000 ? 'text-red-400' : 'text-slate-500'}`}>
+                {charCount.toLocaleString()} / 20,000
+              </span>
+            </div>
+            <textarea
+              id="job-description"
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job description here..."
+              rows={8}
+              maxLength={20000}
+              required
+              minLength={30}
+              className="w-full rounded-xl border border-slate-700/70 bg-slate-900 px-4 py-3 text-sm leading-relaxed text-slate-100 placeholder-slate-500 focus:border-brand-500/60 focus:outline-none focus:ring-1 focus:ring-brand-500/30 resize-y"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide" htmlFor="job-title">
+                Job Title <span className="text-slate-600 normal-case">(optional)</span>
+              </label>
+              <input
+                id="job-title"
+                type="text"
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder="e.g. Backend Engineer"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700/70 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide" htmlFor="company-name">
+                Company <span className="text-slate-600 normal-case">(optional)</span>
+              </label>
+              <input
+                id="company-name"
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="e.g. Acme"
+                className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700/70 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30"
+              />
+            </div>
+          </div>
+        </section>
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+        <div role="alert" className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
 
-      <button
-        id="job-analyze-btn"
-        type="submit"
-        disabled={isLoading || charCount < 30}
-        className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-bold text-sm bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-lg shadow-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.01]"
-      >
-        {isLoading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Analyzing Job Description…
-          </>
-        ) : (
-          <>
-            <Target className="w-4 h-4" />
-            Analyze & Match
-            <ArrowRight className="w-4 h-4" />
-          </>
-        )}
-      </button>
+      <div className="glass-card p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white">Step 03 · Analyze Job Fit</p>
+          <p className="text-sm text-slate-400 mt-1">Compare your resume with the requirements of this job.</p>
+        </div>
+        <button
+          id="job-analyze-btn"
+          type="submit"
+          disabled={isLoading || !resumeFile || charCount < 30}
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white hover:bg-brand-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-300 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+        >
+          {isLoading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Analyzing...
+            </>
+          ) : (
+            <>
+              Analyze Job Fit
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </>
+          )}
+        </button>
+      </div>
+
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/30 px-6 py-8 sm:py-10 text-center" aria-label="Job fit analysis preview">
+        <div className="mx-auto w-11 h-11 rounded-xl border border-slate-700 bg-slate-900 flex items-center justify-center text-slate-400">
+          <Target className="w-5 h-5" aria-hidden="true" />
+        </div>
+        <h2 className="text-lg font-semibold text-white mt-4">Ready to check your fit?</h2>
+        <p className="max-w-xl mx-auto text-sm leading-relaxed text-slate-400 mt-2">
+          Upload your resume and paste a job description to see where you match, where you fall short, and what you can improve.
+        </p>
+      </section>
     </form>
   );
 };
@@ -387,6 +624,7 @@ const JobDescriptionInput: React.FC<{
 export const JobIntelligencePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'analyze' | 'history'>('analyze');
   const [result, setResult] = useState<JobAnalysisResponse | null>(null);
+  const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<JobAnalysisResponse[]>([]);
@@ -410,11 +648,13 @@ export const JobIntelligencePage: React.FC = () => {
     }
   };
 
-  const handleAnalyze = async (req: JobAnalysisRequest) => {
+  const handleAnalyze = async (req: JobAnalysisRequest, resumeFile: File) => {
     setIsLoading(true);
     setError(null);
     try {
+      const resumeData = await analyzeResume(resumeFile, req.jobTitle);
       const data = await analyzeJob(req);
+      setResumeAnalysis(resumeData);
       setResult(data);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
@@ -428,6 +668,7 @@ export const JobIntelligencePage: React.FC = () => {
   };
 
   const handleSelectHistory = (item: JobAnalysisResponse) => {
+    setResumeAnalysis(null);
     setResult(item);
     setActiveTab('analyze');
   };
@@ -439,10 +680,10 @@ export const JobIntelligencePage: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent flex items-center gap-3">
             <Briefcase className="w-7 h-7 text-brand-400" />
-            Job & Career Intelligence
+            Job Fit Analyzer
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Paste a job description to match it against your profile and get a personalised skill gap report.
+            See how well your resume matches a specific job before you apply.
           </p>
         </div>
 
@@ -478,7 +719,14 @@ export const JobIntelligencePage: React.FC = () => {
       {/* Main Content */}
       {activeTab === 'analyze' ? (
         result ? (
-          <AnalysisResultView result={result} onReset={() => setResult(null)} />
+          <AnalysisResultView
+            result={result}
+            resumeAnalysis={resumeAnalysis ?? undefined}
+            onReset={() => {
+              setResult(null);
+              setResumeAnalysis(null);
+            }}
+          />
         ) : (
           <JobDescriptionInput onAnalyze={handleAnalyze} isLoading={isLoading} error={error} />
         )
