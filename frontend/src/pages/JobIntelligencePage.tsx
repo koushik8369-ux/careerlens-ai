@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { analyzeJob, getJobHistory } from '../services/jobIntelligenceService';
+import { analyzeJob, getJobHistory, getRecommendedJobs } from '../services/jobIntelligenceService';
 import { analyzeResume } from '../services/resumeService';
 import type {
   JobAnalysisRequest,
   JobAnalysisResponse,
+  JobRecommendation,
+  JobRecommendationsResponse,
   ResumeAnalysisResponse,
   SkillGap,
   CareerRecommendation,
@@ -30,6 +32,9 @@ import {
   UploadCloud,
   FileText,
   X,
+  MapPin,
+  Building2,
+  Star,
 } from 'lucide-react';
 
 // ── Score Ring ───────────────────────────────────────────────────────────────
@@ -134,13 +139,42 @@ const getSkillOverlap = (resumeSkills: string[], jobSkills: string[]) => {
   return jobSkills.filter((skill) => normalizedResumeSkills.has(skill.trim().toLocaleLowerCase()));
 };
 
+const getRecommendationSalary = (job: JobRecommendation) => {
+  if (job.salary?.trim()) return job.salary;
+  if (job.minimumSalary == null && job.maximumSalary == null) return 'Salary not disclosed';
+  const amounts = [job.minimumSalary, job.maximumSalary]
+    .filter((amount): amount is number => amount != null)
+    .map((amount) => amount.toLocaleString());
+  return `${job.currency ? `${job.currency} ` : ''}${amounts.join(' – ')}`;
+};
+
+const getRecommendationExperience = (job: JobRecommendation) => {
+  if (job.experience?.trim()) return job.experience;
+  if (job.minimumExperience == null && job.maximumExperience == null) return 'Not specified';
+  const minimum = job.minimumExperience ?? job.maximumExperience;
+  const maximum = job.maximumExperience ?? job.minimumExperience;
+  return minimum === maximum ? `${minimum} years` : `${minimum}–${maximum} years`;
+};
+
 // ── Analysis Result View ──────────────────────────────────────────────────────
 
 const AnalysisResultView: React.FC<{
   result: JobAnalysisResponse;
   resumeAnalysis?: ResumeAnalysisResponse;
+  recommendations: JobRecommendationsResponse | null;
+  recommendationsLoading: boolean;
+  recommendationsError: string | null;
+  onRetryRecommendations: () => void;
   onReset: () => void;
-}> = ({ result, resumeAnalysis, onReset }) => {
+}> = ({
+  result,
+  resumeAnalysis,
+  recommendations,
+  recommendationsLoading,
+  recommendationsError,
+  onRetryRecommendations,
+  onReset,
+}) => {
   const [openQuestionIdx, setOpenQuestionIdx] = useState<number | null>(null);
   const requiredSkills = [...new Set(result.requiredSkills)];
   const preferredSkills = [...new Set(result.preferredSkills)];
@@ -151,6 +185,10 @@ const AnalysisResultView: React.FC<{
   const matchedPreferredSkills = resumeAnalysis
     ? getSkillOverlap(resumeAnalysis.detectedSkills, preferredSkills)
     : [];
+  const missingPreferredSkills = preferredSkills.filter(
+    (skill) => !matchedPreferredSkills.includes(skill),
+  );
+  const strongSkills = [...new Set([...matchedRequiredSkills, ...matchedPreferredSkills])];
   const resumeFitScore = requiredSkills.length > 0
     ? Math.round((matchedRequiredSkills.length / requiredSkills.length) * 100)
     : null;
@@ -253,6 +291,238 @@ const AnalysisResultView: React.FC<{
                   />
                 ))}
               </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {resumeAnalysis && (
+        <section
+          className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5"
+          aria-labelledby="skill-gap-insights-heading"
+        >
+          <div>
+            <h3 id="skill-gap-insights-heading" className="text-sm font-bold text-slate-200 uppercase tracking-wide">
+              Skill Gap Insights
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Based on the skills detected in your resume and the requirements listed for this job.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="min-w-0 rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-red-300">High Priority</h4>
+                <p className="text-xs text-slate-500 mt-1">Missing required skills</p>
+              </div>
+              {missingRequiredSkills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {missingRequiredSkills.map((skill) => (
+                    <SkillChip key={skill} name={skill} type="missing" />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No required skill gaps detected.</p>
+              )}
+            </div>
+
+            <div className="min-w-0 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-amber-300">Medium Priority</h4>
+                <p className="text-xs text-slate-500 mt-1">Missing preferred skills</p>
+              </div>
+              {missingPreferredSkills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {missingPreferredSkills.map((skill) => (
+                    <SkillChip key={skill} name={skill} type="preferred" />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No preferred skill gaps detected.</p>
+              )}
+            </div>
+
+            <div className="min-w-0 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 space-y-3">
+              <div>
+                <h4 className="text-sm font-semibold text-emerald-300">Already Strong</h4>
+                <p className="text-xs text-slate-500 mt-1">Required or preferred skills found</p>
+              </div>
+              {strongSkills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {strongSkills.map((skill) => (
+                    <SkillChip key={skill} name={skill} type="matched" />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">No matching job skills were detected in this resume.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 space-y-1.5">
+              <h4 className="text-sm font-semibold text-slate-200">What to improve</h4>
+              <p className="text-xs leading-relaxed text-slate-400">
+                {missingRequiredSkills.length > 0
+                  ? `Build practical experience and resume evidence for the missing required skills: ${missingRequiredSkills.join(', ')}.`
+                  : missingPreferredSkills.length > 0
+                    ? `Consider building experience and resume evidence for these preferred skills: ${missingPreferredSkills.join(', ')}.`
+                    : 'No gaps were identified among the analyzed required and preferred skills.'}
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 p-4 space-y-1.5">
+              <h4 className="text-sm font-semibold text-slate-200">Why this matters</h4>
+              <p className="text-xs leading-relaxed text-slate-400">
+                {missingRequiredSkills.length > 0
+                  ? 'Required skills are explicitly listed for this role, so gaps can reduce alignment with its stated needs. A skill not detected in the resume may still be part of your experience; it may simply need to be made explicit.'
+                  : 'Required skills are the role’s stated baseline. No missing required skills were detected in this resume analysis.'}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {resumeAnalysis && (
+        <section
+          className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5"
+          aria-labelledby="recommended-jobs-heading"
+        >
+          <div>
+            <h3 id="recommended-jobs-heading" className="text-sm font-bold text-slate-200 uppercase tracking-wide">
+              Recommended Jobs
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Ranked from the job dataset using the skills detected in {resumeAnalysis.fileName}.
+            </p>
+            {recommendations && (
+              <p className="text-xs text-slate-500 mt-1">
+                Score: {recommendations.scoreFormula}. Unknown experience or location contributes a neutral 50%.
+              </p>
+            )}
+          </div>
+
+          {recommendationsLoading ? (
+            <div role="status" className="flex items-center justify-center gap-3 py-8 text-sm text-slate-400">
+              <div className="w-5 h-5 border-2 border-brand-400 border-t-transparent rounded-full animate-spin" />
+              Finding jobs that match your resume skills...
+            </div>
+          ) : recommendationsError ? (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p role="alert" className="text-sm text-red-300">{recommendationsError}</p>
+              <button
+                type="button"
+                onClick={onRetryRecommendations}
+                className="shrink-0 rounded-lg border border-red-400/30 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/10"
+              >
+                Try again
+              </button>
+            </div>
+          ) : recommendations && recommendations.jobs.length > 0 ? (
+            <>
+              <p className="text-xs text-slate-500">
+                Showing {recommendations.jobs.length} of {recommendations.totalMatches.toLocaleString()} matching jobs.
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {recommendations.jobs.map((job) => (
+                  <article
+                    key={job.jobId}
+                    className="min-w-0 rounded-xl border border-slate-700/70 bg-slate-800/40 p-4 sm:p-5 space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4 className="break-words text-base font-bold text-slate-100">{job.title}</h4>
+                        {job.companyName && (
+                          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                            <Building2 className="w-3.5 h-3.5 shrink-0" />
+                            <span className="break-words">{job.companyName}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="text-2xl font-extrabold" style={{ color: scoreColor(job.matchPercentage) }}>
+                          {job.matchPercentage}%
+                        </span>
+                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Job fit</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-400">
+                      {job.location && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-brand-400" />
+                          {job.location}
+                        </span>
+                      )}
+                      <span>{getRecommendationExperience(job)}</span>
+                      <span>{getRecommendationSalary(job)}</span>
+                      {job.aggregateRating != null && (
+                        <span className="inline-flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-amber-400" />
+                          {job.aggregateRating.toFixed(1)}
+                          {job.reviewsCount != null && job.reviewsCount > 0
+                            ? ` (${job.reviewsCount.toLocaleString()} reviews)`
+                            : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    {job.jobDescription && (
+                      <p className="break-words text-xs leading-relaxed text-slate-400">
+                        {job.jobDescription.length > 280
+                          ? `${job.jobDescription.slice(0, 280).trimEnd()}…`
+                          : job.jobDescription}
+                      </p>
+                    )}
+
+                    <div className="space-y-3 border-t border-slate-700/70 pt-3">
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-300">
+                          Matched skills
+                        </p>
+                        {job.matchedSkills.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {job.matchedSkills.slice(0, 6).map((skill) => (
+                              <SkillChip key={skill} name={skill} type="matched" />
+                            ))}
+                            {job.matchedSkills.length > 6 && (
+                              <span className="self-center text-[11px] text-slate-500">
+                                +{job.matchedSkills.length - 6} more
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">No matching skills listed.</p>
+                        )}
+                      </div>
+                      {job.missingSkills.length > 0 && (
+                        <div>
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300">
+                            Missing skills
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {job.missingSkills.slice(0, 6).map((skill) => (
+                              <SkillChip key={skill} name={skill} type="preferred" />
+                            ))}
+                            {job.missingSkills.length > 6 && (
+                              <span className="self-center text-[11px] text-slate-500">
+                                +{job.missingSkills.length - 6} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-slate-700/70 bg-slate-800/30 px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-slate-200">No matching jobs found</p>
+              <p className="mt-1 text-xs text-slate-400">
+                No jobs in the imported dataset matched the skills detected in this resume.
+              </p>
             </div>
           )}
         </section>
@@ -625,6 +895,9 @@ export const JobIntelligencePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'analyze' | 'history'>('analyze');
   const [result, setResult] = useState<JobAnalysisResponse | null>(null);
   const [resumeAnalysis, setResumeAnalysis] = useState<ResumeAnalysisResponse | null>(null);
+  const [recommendations, setRecommendations] = useState<JobRecommendationsResponse | null>(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<JobAnalysisResponse[]>([]);
@@ -648,14 +921,33 @@ export const JobIntelligencePage: React.FC = () => {
     }
   };
 
+  const loadRecommendations = async (resumeAnalysisId: string) => {
+    setRecommendationsLoading(true);
+    setRecommendationsError(null);
+    try {
+      setRecommendations(await getRecommendedJobs(resumeAnalysisId));
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } };
+      setRecommendations(null);
+      setRecommendationsError(
+        axiosErr?.response?.data?.message || 'Could not load recommended jobs. Please try again.',
+      );
+    } finally {
+      setRecommendationsLoading(false);
+    }
+  };
+
   const handleAnalyze = async (req: JobAnalysisRequest, resumeFile: File) => {
     setIsLoading(true);
     setError(null);
+    setRecommendations(null);
+    setRecommendationsError(null);
     try {
       const resumeData = await analyzeResume(resumeFile, req.jobTitle);
       const data = await analyzeJob(req);
       setResumeAnalysis(resumeData);
       setResult(data);
+      await loadRecommendations(resumeData.id);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } };
       const msg =
@@ -669,6 +961,8 @@ export const JobIntelligencePage: React.FC = () => {
 
   const handleSelectHistory = (item: JobAnalysisResponse) => {
     setResumeAnalysis(null);
+    setRecommendations(null);
+    setRecommendationsError(null);
     setResult(item);
     setActiveTab('analyze');
   };
@@ -722,9 +1016,17 @@ export const JobIntelligencePage: React.FC = () => {
           <AnalysisResultView
             result={result}
             resumeAnalysis={resumeAnalysis ?? undefined}
+            recommendations={recommendations}
+            recommendationsLoading={recommendationsLoading}
+            recommendationsError={recommendationsError}
+            onRetryRecommendations={() => {
+              if (resumeAnalysis) void loadRecommendations(resumeAnalysis.id);
+            }}
             onReset={() => {
               setResult(null);
               setResumeAnalysis(null);
+              setRecommendations(null);
+              setRecommendationsError(null);
             }}
           />
         ) : (

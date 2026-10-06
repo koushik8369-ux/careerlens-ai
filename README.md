@@ -45,6 +45,7 @@ All endpoints use the `/api` prefix. Health, registration, and login are public;
 | POST | `/api/job-intelligence/analyze` |
 | GET | `/api/job-intelligence/history` |
 | GET | `/api/job-intelligence/:id` |
+| GET | `/api/jobs/recommended?resumeAnalysisId=<id>&limit=<1-25>` |
 | POST, GET | `/api/career-assistant/conversations` |
 | GET, POST | `/api/career-assistant/conversations/:conversationId/messages` |
 | POST | `/api/career-assistant/action-plan` |
@@ -59,7 +60,22 @@ All endpoints use the `/api` prefix. Health, registration, and login are public;
 
 Resume analysis accepts multipart form data with a required `file` and optional `targetRole`. Supported types are PDF, DOCX, DOC, and TXT; uploads are limited to 10 MB and processed in memory.
 
-MongoDB collections are `users`, `resumeanalyses`, `jobanalyses`, `careerassistantconversations`, `careerassistantmessages`, and `careerplans`. Profile data is embedded in `users`; career-plan items are embedded in their plan. ObjectId API values are strings.
+MongoDB collections are `users`, `resumeanalyses`, `jobanalyses`, `jobpostings`, `careerassistantconversations`, `careerassistantmessages`, and `careerplans`. Profile data is embedded in `users`; career-plan items are embedded in their plan. ObjectId API values are strings.
+
+### Dataset job recommendations
+
+Job recommendations use the authenticated user's saved resume analysis (`resumeAnalysisId`); client-provided skill lists are not trusted. `GET /api/jobs/recommended` returns at most 10 ranked matches by default and accepts a `limit` from 1 to 25. Jobs are queried from the indexed `jobpostings` collection using normalized resume skills, not by reading the workbook for each request. It returns `503` with an explicit message until the dataset has been imported. The dataset contains no job URL, so recommendations do not include invented apply links.
+
+The `server` package includes a streaming importer for the local Kaggle XLSX file. It skips rows without a title, job ID, or usable skill tags; keeps the first valid row for a duplicate job ID; and upserts the remaining records in batches. A dry run validates the workbook without connecting to MongoDB. Neither the workbook nor converted job data belongs in the repository.
+
+```powershell
+npm --prefix server run import:jobs -- --dry-run "C:\path\to\indian-job-market-dataset-2025.xlsx"
+npm --prefix server run import:jobs -- "C:\path\to\indian-job-market-dataset-2025.xlsx"
+```
+
+The import command uses the server's existing `MONGODB_URI`; do not place credentials in command arguments or source files. It creates a unique dataset/job ID index and a dataset/normalized-skill index.
+
+Each recommendation's match percentage is `70% × skill match + 20% × experience compatibility + 10% × location relevance`. Skill match is the share of the job's listed tags present among detected resume skills after conservative alias normalization. Experience compatibility compares explicit years found in detected resume experience text with the job's minimum years; when either value is unavailable, that component is neutral (50%). Location is a case-insensitive text match between the user's saved profile location and the listed job location; when either is unavailable, that component is neutral (50%). This is deterministic matching, not an AI-generated score.
 
 ## Local Development
 

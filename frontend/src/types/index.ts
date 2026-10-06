@@ -148,6 +148,36 @@ export interface JobAnalysisResponse {
   createdAt: string;
 }
 
+export interface JobRecommendation {
+  jobId: string;
+  title: string;
+  companyName: string | null;
+  location: string | null;
+  experience: string | null;
+  salary: string | null;
+  currency: string | null;
+  minimumExperience: number | null;
+  maximumExperience: number | null;
+  minimumSalary: number | null;
+  maximumSalary: number | null;
+  matchPercentage: number;
+  skillMatchPercent: number;
+  experienceCompatibilityPercent: number;
+  locationRelevancePercent: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  jobDescription: string | null;
+  aggregateRating: number | null;
+  reviewsCount: number | null;
+}
+
+export interface JobRecommendationsResponse {
+  resumeAnalysisId: string;
+  totalMatches: number;
+  scoreFormula: string;
+  jobs: JobRecommendation[];
+}
+
 // ── Phase 5: Career Assistant & Career Plan ────────────────────────────────
 
 export interface CareerAssistantConversation {
