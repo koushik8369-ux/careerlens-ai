@@ -66,10 +66,10 @@ export const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
       <div className="text-center max-w-xl mx-auto mb-8">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs font-semibold uppercase tracking-wider mb-4">
           <Sparkles className="w-3.5 h-3.5" />
-          AI Resume Scanner
+          Resume Scanner
         </div>
         <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-          Upload Your Resume for AI Analysis
+          Upload Your Resume for Analysis
         </h2>
         <p className="text-slate-400 text-sm mt-2">
           Get an instant ATS score, detected skills breakdown, missing section warnings, and job role matching.
@@ -180,7 +180,7 @@ export const FileUploadDropzone: React.FC<FileUploadDropzoneProps> = ({
           {isLoading ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Analyzing Resume with AI...</span>
+              <span>Parsing and analyzing resume...</span>
             </>
           ) : (
             <>

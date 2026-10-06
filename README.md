@@ -18,7 +18,7 @@ The active API is in `server/`. The original Spring Boot/MySQL implementation in
 
 - Registration, login, bcrypt password hashing, JWT authentication, and protected routes
 - User profile and dashboard
-- Resume Analyzer: PDF, DOCX, DOC, and TXT uploads; deterministic scoring, role matching, and history
+- Resume Analyzer: PDF, DOCX, DOC, and TXT uploads; evidence-based scoring, extracted profile and resume sections, ATS-style checks, job-market insights, recommendations, and history
 - Job Intelligence: deterministic job description analysis, skill matching, recommendations, and history
 - Career Assistant conversations and deterministic responses
 - Resume improvement, skill roadmap, project recommendations, interview preparation, and action plan
@@ -59,6 +59,8 @@ All endpoints use the `/api` prefix. Health, registration, and login are public;
 | PATCH | `/api/career-plans/:id/items/:itemId` |
 
 Resume analysis accepts multipart form data with a required `file` and optional `targetRole`. Supported types are PDF, DOCX, DOC, and TXT; uploads are limited to 10 MB and processed in memory.
+
+Resume analysis remains behind the existing authenticated endpoints and stores its extracted result in the owner-scoped `resumeanalyses` collection; extracted raw text stays private. Its deterministic ATS-style checklist score is 0–100: contact information (10), summary quality (10), detected skills (up to 15), target-role keyword coverage (10), experience evidence (up to 20), education (up to 10), projects (up to 10), certifications (5), and section completeness (10). This practical checklist is not an official ATS score. Role-fit percentage is the share of expected target-role skills detected in the resume, with no score floor or bonus. ATS checks also report detected action verbs and quantified achievement lines. Role keywords, weak/missing sections, and improvement suggestions are based on parsed resume content. When the job dataset is available, saved analysis also includes ranked job matches and skill gaps from the existing job recommendation service; if it is unavailable, the resume analysis still completes with an explicit unavailable status.
 
 MongoDB collections are `users`, `resumeanalyses`, `jobanalyses`, `jobpostings`, `careerassistantconversations`, `careerassistantmessages`, and `careerplans`. Profile data is embedded in `users`; career-plan items are embedded in their plan. ObjectId API values are strings.
 

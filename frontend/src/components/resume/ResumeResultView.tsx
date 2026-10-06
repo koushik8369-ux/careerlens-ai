@@ -11,6 +11,10 @@ import {
   RefreshCw,
   Target,
   FileText,
+  Mail,
+  Phone,
+  BadgeCheck,
+  MapPin,
 } from 'lucide-react';
 
 interface ResumeResultViewProps {
@@ -19,6 +23,20 @@ interface ResumeResultViewProps {
 }
 
 export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, onReset }) => {
+  const atsChecks: Array<{ title: string; entries: string[] }> = [
+    { title: 'Sections to add', entries: analysis.atsAnalysis?.missingSections ?? [] },
+    { title: 'Areas to strengthen', entries: analysis.atsAnalysis?.weakSections ?? [] },
+    {
+      title: 'Action verbs',
+      entries: analysis.atsAnalysis?.actionVerbs?.matches ?? [],
+    },
+    {
+      title: 'Quantified achievements',
+      entries: analysis.atsAnalysis?.quantifiedAchievements?.examples ?? [],
+    },
+    { title: 'Content checks', entries: analysis.atsAnalysis?.contentIssues ?? [] },
+  ];
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10';
     if (score >= 65) return 'text-amber-400 border-amber-500/30 bg-amber-500/10';
@@ -70,7 +88,7 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Award className="w-4 h-4 text-brand-400" />
-              Overall ATS Score
+              Resume Score
             </p>
             <div className="flex items-baseline gap-3 mt-2">
               <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-100">
@@ -82,6 +100,21 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
               <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold border ${getScoreColor(analysis.overallScore)}`}>
                 {getScoreBadgeText(analysis.overallScore)}
               </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-slate-400">
+              {([
+                ['Contact information', analysis.scoreBreakdown?.contactInformation],
+                ['Summary', analysis.scoreBreakdown?.summary],
+                ['Skills', analysis.scoreBreakdown?.skills],
+                ['Role keywords', analysis.scoreBreakdown?.targetKeywords],
+                ['Experience', analysis.scoreBreakdown?.experience],
+                ['Education', analysis.scoreBreakdown?.education],
+                ['Projects', analysis.scoreBreakdown?.projects],
+                ['Certifications', analysis.scoreBreakdown?.certifications],
+                ['Completeness', analysis.scoreBreakdown?.completeness],
+              ] as Array<[string, number | undefined]>).map(([label, score]) => (
+                <span key={label}>{label}: <strong className="text-slate-200">{score ?? 0}</strong></span>
+              ))}
             </div>
           </div>
           <div className="relative w-24 h-24 flex items-center justify-center">
@@ -116,7 +149,7 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
             </p>
             <div className="flex items-baseline gap-3 mt-2">
               <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-purple-300">
-                {analysis.matchScore || 75}%
+                {analysis.matchScore ?? 0}%
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-3">
@@ -128,6 +161,20 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
           </div>
         </div>
       </div>
+
+      {(analysis.detectedName || analysis.detectedEmail || analysis.detectedPhone || analysis.detectedSummary) && (
+        <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8">
+          <h3 className="text-lg font-bold text-slate-100 mb-4">Profile Information Detected</h3>
+          <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
+            {analysis.detectedName && <span className="font-semibold text-slate-100">{analysis.detectedName}</span>}
+            {analysis.detectedEmail && <span className="inline-flex items-center gap-2"><Mail className="w-4 h-4 text-brand-400" />{analysis.detectedEmail}</span>}
+            {analysis.detectedPhone && <span className="inline-flex items-center gap-2"><Phone className="w-4 h-4 text-brand-400" />{analysis.detectedPhone}</span>}
+          </div>
+          {analysis.detectedSummary && (
+            <p className="mt-4 text-sm leading-relaxed text-slate-300 border-t border-slate-800 pt-4">{analysis.detectedSummary}</p>
+          )}
+        </section>
+      )}
 
       {/* Detected Skills Section */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-xl">
@@ -149,10 +196,25 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
         ) : (
           <p className="text-sm text-slate-400 italic">No specific technical skills matched automatically.</p>
         )}
+        {analysis.skillCategories?.length > 0 && (
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {analysis.skillCategories.map(({ category, skills }) => (
+              <div key={category} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-400">{category}</h4>
+                <p className="mt-2 text-xs leading-relaxed text-slate-200">{skills.join(', ')}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {analysis.strongSkills?.length > 0 && (
+          <p className="mt-4 text-xs text-emerald-300">
+            Repeatedly mentioned skills: {analysis.strongSkills.join(', ')}
+          </p>
+        )}
       </div>
 
       {/* Grid for Education, Experience & Projects */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {/* Education */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl space-y-3">
           <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
@@ -209,6 +271,20 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
             <p className="text-xs text-slate-500 italic">None detected</p>
           )}
         </div>
+
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl space-y-3">
+          <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+            <BadgeCheck className="w-4 h-4 text-amber-400" />
+            Certifications
+          </h4>
+          {analysis.detectedCertifications?.length ? (
+            <ul className="space-y-2 text-xs text-slate-300">
+              {analysis.detectedCertifications.map((certification, index) => (
+                <li key={index} className="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">{certification}</li>
+              ))}
+            </ul>
+          ) : <p className="text-xs text-slate-500 italic">None detected</p>}
+        </div>
       </div>
 
       {/* Missing Sections Alert */}
@@ -229,11 +305,103 @@ export const ResumeResultView: React.FC<ResumeResultViewProps> = ({ analysis, on
         </div>
       )}
 
+      <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">Practical ATS-Style Checks</h3>
+            <p className="mt-1 text-xs text-slate-500">Informational checks only; this is not an official ATS score.</p>
+          </div>
+          <span className="rounded-lg border border-brand-500/20 bg-brand-500/10 px-3 py-1.5 text-sm font-bold text-brand-300">
+            Checklist score: {analysis.atsAnalysis?.score ?? analysis.overallScore}/100
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+            <h4 className="text-sm font-semibold text-slate-200">Contact details</h4>
+            <p className="mt-2 text-xs text-slate-400">
+              Email {analysis.atsAnalysis?.contactInformation?.emailPresent ? 'detected' : 'not detected'} ·
+              Phone {analysis.atsAnalysis?.contactInformation?.phonePresent ? 'detected' : 'not detected'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+            <h4 className="text-sm font-semibold text-slate-200">Target-role keyword coverage</h4>
+            <p className="mt-2 text-xs text-slate-400">{analysis.atsAnalysis?.keywordCoverage?.percentage ?? 0}% matched against the selected role skill list.</p>
+            {analysis.atsAnalysis?.keywordCoverage?.missing?.length > 0 && (
+              <p className="mt-2 text-xs text-amber-300">Not detected: {analysis.atsAnalysis.keywordCoverage.missing.join(', ')}</p>
+            )}
+          </div>
+          {atsChecks.map(({ title, entries }) => (
+            <div key={title} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+              <h4 className="text-sm font-semibold text-slate-200">{title}</h4>
+              {entries.length > 0
+                ? <ul className="mt-2 space-y-1 text-xs text-slate-400">{entries.map((entry) => <li key={entry}>{entry}</li>)}</ul>
+                : <p className="mt-2 text-xs text-amber-300">{title === 'Action verbs' ? 'No listed action verbs detected' : title === 'Quantified achievements' ? 'No quantified outcomes detected' : 'No gaps detected'}</p>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8">
+        <h3 className="text-lg font-bold text-slate-100">Job-Market Insights</h3>
+        {analysis.jobMarketInsights?.status === 'unavailable' ? (
+          <p className="mt-3 text-sm text-amber-300">{analysis.jobMarketInsights.message ?? 'Job-market data is currently unavailable.'}</p>
+        ) : analysis.jobMarketInsights?.status !== 'available' ? (
+          <p className="mt-3 text-sm text-slate-400">No job-market analysis is available for this saved result.</p>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-slate-400">
+              {analysis.jobMarketInsights.totalMatches.toLocaleString()} dataset jobs matched the detected skills.
+            </p>
+            {analysis.jobMarketInsights.suitableRoles.length > 0 && (
+              <p className="mt-3 text-sm text-slate-300">
+                Roles among top job matches: {analysis.jobMarketInsights.suitableRoles.map(({ title, jobCount }) => `${title} (${jobCount})`).join(' · ')}
+              </p>
+            )}
+            {analysis.jobMarketInsights.skillGaps.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold text-amber-300">Skills frequently requested in recommended jobs but not detected</h4>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {analysis.jobMarketInsights.skillGaps.map(({ skill, jobCount }) => (
+                    <span key={skill} className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">{skill} · {jobCount} jobs</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {analysis.jobMarketInsights.commonSkills.length > 0 && (
+              <p className="mt-4 text-xs text-slate-400">Frequently listed skills: {analysis.jobMarketInsights.commonSkills.map(({ skill }) => skill).join(', ')}</p>
+            )}
+            {analysis.jobMarketInsights.jobs.length > 0 && (
+              <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {analysis.jobMarketInsights.jobs.map((job) => (
+                  <article key={job.jobId} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h4 className="font-semibold text-slate-100">{job.title}</h4>
+                        <p className="mt-1 text-xs text-slate-400">{job.companyName ?? 'Company not listed'}{job.location ? ` · ${job.location}` : ''}</p>
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-brand-500/10 px-2.5 py-1 text-xs font-bold text-brand-300">{job.matchPercentage}% match</span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">
+                      {job.experience ?? 'Experience not listed'}{job.salary ? ` · ${job.salary}` : ''}
+                      {job.aggregateRating != null ? ` · ★ ${job.aggregateRating}${job.reviewsCount != null ? ` (${job.reviewsCount})` : ''}` : ''}
+                    </p>
+                    {job.jobDescription && <p className="mt-3 text-xs leading-relaxed text-slate-400 line-clamp-3">{job.jobDescription}</p>}
+                    {job.matchedSkills.length > 0 && <p className="mt-3 text-xs text-emerald-300">Matched: {job.matchedSkills.join(', ')}</p>}
+                    {job.missingSkills.length > 0 && <p className="mt-1 text-xs text-amber-300">Gaps: {job.missingSkills.slice(0, 6).join(', ')}</p>}
+                    <p className="mt-3 text-xs text-slate-500 inline-flex items-center gap-1"><MapPin className="w-3 h-3" />No application link supplied by dataset</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
       {/* Improvement Suggestions */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 backdrop-blur-xl">
         <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-          AI Improvement Recommendations
+          Evidence-Based Improvement Recommendations
         </h3>
         <ul className="space-y-3 text-sm text-slate-300">
           {analysis.improvementSuggestions?.map((sug, i) => (
