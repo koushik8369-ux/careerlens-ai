@@ -85,15 +85,71 @@ export type AuthResponse = LoginResponse;
 export interface ResumeAnalysisResponse {
   id: string;
   fileName: string;
-  fileType: string;
+  fileType: string | null;
   overallScore: number;
+  scoreBreakdown: {
+    contactInformation: number;
+    summary: number;
+    skills: number;
+    targetKeywords: number;
+    experience: number;
+    education: number;
+    projects: number;
+    certifications: number;
+    completeness: number;
+  };
   targetRole?: string;
   matchScore?: number;
+  detectedName: string | null;
+  detectedEmail: string | null;
+  detectedPhone: string | null;
+  detectedSummary: string | null;
   detectedSkills: string[];
+  skillCategories: Array<{ category: string; skills: string[] }>;
+  strongSkills: string[];
   detectedEducation: string[];
   detectedExperience: string[];
   detectedProjects: string[];
+  detectedCertifications: string[];
   missingSections: string[];
+  atsAnalysis: {
+    score: number;
+    scoreBreakdown: ResumeAnalysisResponse['scoreBreakdown'];
+    missingSections: string[];
+    weakSections: string[];
+    contactInformation: {
+      emailPresent: boolean;
+      phonePresent: boolean;
+      complete: boolean;
+    };
+    summaryQuality: 'missing' | 'brief' | 'present';
+    keywordCoverage: {
+      targetRole: string[];
+      matched: string[];
+      missing: string[];
+      jobMarketGaps: string[];
+      percentage: number;
+    };
+    actionVerbs: {
+      detected: boolean;
+      matches: string[];
+    };
+    quantifiedAchievements: {
+      detected: boolean;
+      examples: string[];
+    };
+    contentIssues: string[];
+  };
+  jobMarketInsights: {
+    status: 'available' | 'unavailable' | 'pending';
+    message: string | null;
+    totalMatches: number;
+    suitableRoles: Array<{ title: string; jobCount: number }>;
+    commonSkills: Array<{ skill: string; jobCount: number }>;
+    skillGaps: Array<{ skill: string; jobCount: number }>;
+    jobs: JobRecommendation[];
+  };
+  weakAreas: string[];
   improvementSuggestions: string[];
   createdAt: string;
 }
@@ -146,6 +202,36 @@ export interface JobAnalysisResponse {
   recommendations: CareerRecommendation[];
   interviewQuestions: InterviewQuestion[];
   createdAt: string;
+}
+
+export interface JobRecommendation {
+  jobId: string;
+  title: string;
+  companyName: string | null;
+  location: string | null;
+  experience: string | null;
+  salary: string | null;
+  currency: string | null;
+  minimumExperience: number | null;
+  maximumExperience: number | null;
+  minimumSalary: number | null;
+  maximumSalary: number | null;
+  matchPercentage: number;
+  skillMatchPercent: number;
+  experienceCompatibilityPercent: number;
+  locationRelevancePercent: number;
+  matchedSkills: string[];
+  missingSkills: string[];
+  jobDescription: string | null;
+  aggregateRating: number | null;
+  reviewsCount: number | null;
+}
+
+export interface JobRecommendationsResponse {
+  resumeAnalysisId: string;
+  totalMatches: number;
+  scoreFormula: string;
+  jobs: JobRecommendation[];
 }
 
 // ── Phase 5: Career Assistant & Career Plan ────────────────────────────────

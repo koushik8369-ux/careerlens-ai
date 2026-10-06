@@ -66,6 +66,12 @@ function createResumeModel() {
       records.push(record);
       return record;
     },
+    async updateOne({ _id, user }, { $set }) {
+      const record = records.find((item) => String(item._id) === String(_id)
+        && String(item.user) === String(user));
+      if (record) Object.assign(record, $set);
+      return { matchedCount: record ? 1 : 0, modifiedCount: record ? 1 : 0 };
+    },
     find({ user }) {
       const selected = records.filter((record) => String(record.user) === String(user));
       return {
@@ -95,20 +101,53 @@ function safeError(response, status) {
 
 function validResponseKeys(response) {
   assert.deepEqual(Object.keys(response).sort(), [
-    'createdAt', 'detectedEducation', 'detectedExperience', 'detectedProjects',
-    'detectedSkills', 'fileName', 'fileType', 'id', 'improvementSuggestions',
-    'matchScore', 'missingSections', 'overallScore', 'targetRole',
+    'atsAnalysis', 'createdAt', 'detectedCertifications', 'detectedEducation',
+    'detectedEmail', 'detectedExperience', 'detectedName', 'detectedPhone',
+    'detectedProjects', 'detectedSkills', 'detectedSummary', 'fileName', 'fileType',
+    'id', 'improvementSuggestions', 'jobMarketInsights', 'matchScore', 'missingSections',
+    'overallScore', 'scoreBreakdown', 'skillCategories', 'strongSkills', 'targetRole', 'weakAreas',
   ].sort());
 }
 
 describe('resume analyzer API', () => {
   let app;
   let resumeModel;
+  let jobMarketService;
   let ownerToken;
   let otherToken;
 
   beforeEach(() => {
     resumeModel = createResumeModel();
+    jobMarketService = {
+      async getRecommendedJobs(_user, { resumeAnalysisId }) {
+        return {
+          resumeAnalysisId,
+          totalMatches: 1,
+          jobs: [{
+            jobId: 'job-1',
+            title: 'Backend Engineer',
+            companyName: 'Example Co',
+            location: 'Bengaluru',
+            experience: null,
+            salary: null,
+            currency: null,
+            minimumExperience: null,
+            maximumExperience: null,
+            minimumSalary: null,
+            maximumSalary: null,
+            matchPercentage: 72,
+            skillMatchPercent: 60,
+            experienceCompatibilityPercent: 50,
+            locationRelevancePercent: 100,
+            matchedSkills: ['Java'],
+            missingSkills: ['Docker'],
+            jobDescription: 'Build backend services.',
+            aggregateRating: null,
+            reviewsCount: null,
+          }],
+        };
+      },
+    };
     const userModel = createUserModel();
     const authDependencies = {
       userModel,
@@ -116,7 +155,7 @@ describe('resume analyzer API', () => {
     };
     app = createApp({
       authDependencies,
-      resumeDependencies: { ...authDependencies, resumeModel },
+      resumeDependencies: { ...authDependencies, resumeModel, jobMarketService },
     });
     ownerToken = generateToken('resume-owner@example.com', 'USER', testEnvironment);
     otherToken = generateToken('other-user@example.com', 'USER', testEnvironment);
@@ -176,6 +215,18 @@ describe('resume analyzer API', () => {
     assert.equal(response.body.message, 'The uploaded file content does not match its file extension.');
   });
 
+  it('rejects an overlong target role before saving a resume analysis', async () => {
+    const response = await request(app)
+      .post('/api/resume/analyze')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .field('targetRole', 'x'.repeat(101))
+      .attach('file', Buffer.from(BASIC_RESUME_TEXT), { filename: 'resume.txt', contentType: 'text/plain' });
+
+    safeError(response, 400);
+    assert.equal(response.body.message, 'Invalid target role.');
+    assert.equal(resumeModel.records.length, 0);
+  });
+
   it('requires JWT authentication for analyze, history, and single-record routes', async () => {
     const analyze = await request(app)
       .post('/api/resume/analyze')
@@ -198,10 +249,15 @@ describe('resume analyzer API', () => {
     validResponseKeys(response.body);
     assert.equal(response.body.fileName, 'resume.txt');
     assert.equal(response.body.fileType, 'text/plain');
-    assert.equal(response.body.overallScore, 51);
+    assert.equal(response.body.overallScore, 4);
     assert.equal(response.body.targetRole, 'General Software Engineer');
-    assert.equal(response.body.matchScore, 40);
+    assert.equal(response.body.matchScore, 8);
     assert.deepEqual(response.body.detectedSkills, ['Java']);
+    assert.equal(response.body.jobMarketInsights.status, 'available');
+    assert.equal(response.body.jobMarketInsights.totalMatches, 1);
+    assert.deepEqual(response.body.jobMarketInsights.skillGaps, [{ skill: 'Docker', jobCount: 1 }]);
+    assert.ok(response.body.improvementSuggestions.some((suggestion) => suggestion.includes('Docker')));
+    assert.equal(resumeModel.records[0].jobMarketInsights.status, 'available');
     assert.equal('rawText' in response.body, false);
     assert.equal(JSON.stringify(response.body).includes(BASIC_RESUME_TEXT), false);
     assert.equal(resumeModel.records.length, 1);
@@ -236,6 +292,25 @@ describe('resume analyzer API', () => {
     assert.equal(output.join('\n').includes(resumeText), false);
   });
 
+  it('keeps a successful resume analysis and exposes a clear state when the job dataset is unavailable', async () => {
+    jobMarketService.getRecommendedJobs = async () => {
+      const error = new Error('Job recommendations are not available because the job dataset has not been imported.');
+      error.status = 503;
+      throw error;
+    };
+
+    const response = await request(app)
+      .post('/api/resume/analyze')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .attach('file', Buffer.from(BASIC_RESUME_TEXT), { filename: 'resume.txt', contentType: 'text/plain' });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.jobMarketInsights.status, 'unavailable');
+    assert.match(response.body.jobMarketInsights.message, /dataset has not been imported/);
+    assert.equal(resumeModel.records.length, 1);
+    assert.equal(resumeModel.records[0].jobMarketInsights.status, 'unavailable');
+  });
+
   it('uses optional targetRole and matches the Spring role dictionary', async () => {
     const response = await request(app)
       .post('/api/resume/analyze')
@@ -247,9 +322,9 @@ describe('resume analyzer API', () => {
       });
 
     assert.equal(response.status, 200);
-    assert.equal(response.body.overallScore, 56);
+    assert.equal(response.body.overallScore, 19);
     assert.equal(response.body.targetRole, 'frontend developer');
-    assert.equal(response.body.matchScore, 75);
+    assert.equal(response.body.matchScore, 60);
     assert.deepEqual(response.body.detectedSkills, ['JavaScript', 'HTML', 'CSS', 'React', 'Git', 'REST API']);
   });
 
@@ -446,7 +521,16 @@ describe('resume document parser', () => {
     };
     const app = createApp({
       authDependencies,
-      resumeDependencies: { ...authDependencies, resumeModel, parserService: parserSpy },
+      resumeDependencies: {
+        ...authDependencies,
+        resumeModel,
+        parserService: parserSpy,
+        jobMarketService: {
+          async getRecommendedJobs() {
+            return { totalMatches: 0, jobs: [] };
+          },
+        },
+      },
     });
     const response = await request(app)
       .post('/api/resume/analyze')
