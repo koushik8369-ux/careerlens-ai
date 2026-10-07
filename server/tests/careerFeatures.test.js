@@ -467,7 +467,40 @@ describe('Career Assistant and Plan APIs', () => {
       'HIGH', 'HIGH', 'MEDIUM', 'MEDIUM', 'MEDIUM', 'LOW', 'LOW', 'LOW',
     ]);
     assert.ok(response.body.items.every((item) => item.completed === false));
+    assert.ok(response.body.items.every((item) => item.status === 'NOT_STARTED'));
+    assert.equal(response.body.progress.totalItems, response.body.items.length);
+    assert.equal(response.body.progress.completedItems, 0);
+    assert.equal(response.body.progress.remainingItems, response.body.items.length);
+    assert.equal(response.body.progress.completionPercent, 0);
+    assert.equal(response.body.progress.currentStage, 'SHORT_TERM');
+    assert.match(response.body.items.find((item) => item.skills.includes('Docker')).description, /required skill gap/);
+    assert.match(response.body.items.find((item) => item.skills.includes('Kubernetes')).description, /saved job-market snapshot/);
     assert.equal('user' in response.body, false);
+  });
+
+  it('uses the resume target role when the profile career goal is missing', async () => {
+    models.userModel.records.get(OWNER_ID).profile.careerGoal = null;
+    const response = await request(app)
+      .post('/api/career-plans')
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.careerGoal, 'Backend Engineer');
+    assert.ok(response.body.items.length > 0);
+  });
+
+  it('requires a target and real career evidence instead of generating a generic plan', async () => {
+    models.userModel.records.get(OWNER_ID).profile.careerGoal = null;
+    models.resumeModel.records.length = 0;
+    models.jobModel.records.length = 0;
+
+    const response = await request(app)
+      .post('/api/career-plans')
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    assert.equal(response.status, 400);
+    assert.match(response.body.message, /Not enough information yet/);
+    assert.equal(models.planModel.records.length, 0);
   });
 
   it('archives the previous active plan when generating a replacement', async () => {
@@ -494,7 +527,19 @@ describe('Career Assistant and Plan APIs', () => {
     assert.equal(byId.status, 200);
     assert.equal(updated.status, 200);
     assert.equal(updated.body.items[0].completed, true);
+    assert.equal(updated.body.items[0].status, 'COMPLETED');
+    assert.equal(updated.body.progress.completedItems, 1);
+    assert.equal(updated.body.progress.completionPercent, Math.round(100 / generated.body.items.length));
     assert.equal(updated.body.items[0].title, item.title);
+
+    const inProgress = await request(app)
+      .patch(`/api/career-plans/${generated.body.id}/items/${generated.body.items[1].id}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'IN_PROGRESS' });
+    assert.equal(inProgress.status, 200);
+    assert.equal(inProgress.body.items[1].completed, false);
+    assert.equal(inProgress.body.items[1].status, 'IN_PROGRESS');
+    assert.equal(inProgress.body.progress.inProgressItems, 1);
   });
 
   it('prevents cross-user plan access and rejects malformed update payloads', async () => {
@@ -506,9 +551,19 @@ describe('Career Assistant and Plan APIs', () => {
       .patch(`/api/career-plans/${plan.body.id}/items/${plan.body.items[0].id}`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ completed: 'true' });
+    const invalidItem = await request(app)
+      .patch(`/api/career-plans/${plan.body.id}/items/${'a'.repeat(24)}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'COMPLETED' });
+    const foreignUpdate = await request(app)
+      .patch(`/api/career-plans/${plan.body.id}/items/${plan.body.items[0].id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({ status: 'COMPLETED' });
 
     safeError(foreign, 404);
     safeError(invalid, 400);
+    safeError(invalidItem, 404);
+    safeError(foreignUpdate, 404);
   });
 });
 

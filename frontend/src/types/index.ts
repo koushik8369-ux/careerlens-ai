@@ -301,6 +301,7 @@ export interface CareerActionPlanResult {
 export type CareerPlanStatus = 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 export type CareerPlanCategory = 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM';
 export type CareerPlanItemType = 'LEARNING' | 'PROJECT' | 'INTERVIEW' | 'RESUME';
+export type CareerPlanItemStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 
 export interface CareerPlanItem {
   id: string;
@@ -311,7 +312,17 @@ export interface CareerPlanItem {
   skills: string[];
   priority: string;
   completed: boolean;
+  status: CareerPlanItemStatus;
   sortOrder: number;
+}
+
+export interface CareerPlanProgress {
+  totalItems: number;
+  completedItems: number;
+  inProgressItems: number;
+  remainingItems: number;
+  completionPercent: number;
+  currentStage: CareerPlanCategory | null;
 }
 
 export interface CareerPlan {
@@ -320,11 +331,13 @@ export interface CareerPlan {
   sourceJobAnalysisId: string | null;
   careerGoal: string | null;
   status: CareerPlanStatus;
+  progress: CareerPlanProgress;
   createdAt: string;
   updatedAt: string;
   items: CareerPlanItem[];
 }
 
 export interface CareerPlanItemUpdateRequest {
-  completed: boolean;
+  completed?: boolean;
+  status?: CareerPlanItemStatus;
 }

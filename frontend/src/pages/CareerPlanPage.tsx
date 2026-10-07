@@ -3,7 +3,7 @@ import { AlertCircle, CalendarCheck, Loader2, Sparkles } from 'lucide-react';
 import axios from 'axios';
 import { CareerPlanView } from '../components/career/CareerPlanView';
 import { generateCareerPlan, getCurrentCareerPlan, updateCareerPlanItem } from '../services/careerAssistantService';
-import type { CareerPlan, CareerPlanItem } from '../types';
+import type { CareerPlan, CareerPlanItem, CareerPlanItemStatus } from '../types';
 
 const planErrorMessage = (error: unknown, fallback: string) => {
   if (!axios.isAxiosError(error)) return fallback;
@@ -23,7 +23,10 @@ export const CareerPlanPage: React.FC = () => {
   useEffect(() => {
     getCurrentCareerPlan()
       .then(setPlan)
-      .catch((err: unknown) => setError(planErrorMessage(err, 'Unable to load your career plan.')))
+      .catch((err: unknown) => {
+        if (axios.isAxiosError(err) && err.response?.status === 404) return;
+        setError(planErrorMessage(err, 'Unable to load your career plan.'));
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -35,11 +38,11 @@ export const CareerPlanPage: React.FC = () => {
     finally { setIsGenerating(false); }
   };
 
-  const handleToggleItem = async (item: CareerPlanItem) => {
+  const handleUpdateItem = async (item: CareerPlanItem, status: CareerPlanItemStatus) => {
     if (!plan) return;
     setUpdatingItemId(item.id);
     setError(null);
-    try { setPlan(await updateCareerPlanItem(plan.id, item.id, { completed: !item.completed })); }
+    try { setPlan(await updateCareerPlanItem(plan.id, item.id, { status })); }
     catch (err: unknown) { setError(planErrorMessage(err, 'Unable to update this plan item.')); }
     finally { setUpdatingItemId(null); }
   };
@@ -52,8 +55,14 @@ export const CareerPlanPage: React.FC = () => {
       </header>
       {error && <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{error}</div>}
       {isLoading && <div className="min-h-[35vh] flex flex-col items-center justify-center gap-3 text-slate-400"><Loader2 className="w-8 h-8 text-brand-400 animate-spin" /><p className="text-sm">Loading your career plan...</p></div>}
-      {!isLoading && plan && <CareerPlanView plan={plan} updatingItemId={updatingItemId} onToggleItem={handleToggleItem} />}
-      {!isLoading && !plan && !isGenerating && <div className="glass-card p-10 text-center"><CalendarCheck className="w-10 h-10 text-slate-500 mx-auto mb-3" /><h2 className="text-lg font-semibold text-white">No career plan yet</h2><p className="text-sm text-slate-400 mt-2">Generate a plan to organize your short, medium, and long-term goals.</p></div>}
+      {!isLoading && plan && <CareerPlanView plan={plan} updatingItemId={updatingItemId} onUpdateItem={handleUpdateItem} />}
+      {!isLoading && !plan && !isGenerating && <div className="glass-card p-8 text-center sm:p-10">
+        <CalendarCheck className="mx-auto mb-3 h-10 w-10 text-slate-500" />
+        <h2 className="text-lg font-semibold text-white">Your personalized career roadmap</h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Generate a plan from your saved target role and career evidence. The plan uses your profile, resume analysis, job-fit findings, and available job-market insights.</p>
+        <p className="mt-4 text-sm font-medium text-slate-200">Not enough information yet?</p>
+        <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-slate-500">Add a target role in Profile and provide skills, a Resume Analyzer result, or a Job Intelligence analysis. The plan will not fill missing details with guesses.</p>
+      </div>}
     </div>
   );
 };
