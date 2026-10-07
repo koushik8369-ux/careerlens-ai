@@ -57,7 +57,7 @@ export function createCareerAssistantController({ service = createCareerAssistan
     },
     async projects(request, response, next) {
       try {
-        return response.status(200).json(await service.recommendProjects(request.user));
+        return response.status(200).json(await service.recommendProjects(request.user, request.body ?? {}));
       } catch (error) {
         return next(error);
       }

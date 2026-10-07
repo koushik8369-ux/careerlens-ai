@@ -449,6 +449,12 @@ describe('Career Assistant and Plan APIs', () => {
     assert.deepEqual(Object.keys(improvement.body).sort(), ['missingContent', 'strongerWordingSuggestions', 'weakAreas']);
     assert.deepEqual(roadmap.body.stages.map((stage) => stage.name), ['SHORT_TERM', 'MEDIUM_TERM', 'LONG_TERM']);
     assert.ok(projects.body.recommendations.length);
+    assert.equal(projects.body.targetRole, 'Backend Engineer');
+    assert.deepEqual(projects.body.recommendations[0].skillsToDevelop, ['Docker', 'Kubernetes']);
+    assert.deepEqual(projects.body.recommendations[0].skillsToDemonstrate, ['Java', 'Spring Boot']);
+    assert.deepEqual(projects.body.recommendations[0].marketEvidence.map((item) => [item.skill, item.jobCount]), [['Kubernetes', 4]]);
+    assert.ok(projects.body.recommendations[0].phases.length >= 4);
+    assert.equal(projects.body.contextAvailability.resumeProjects, true);
     assert.ok(interview.body.technicalTopics.length);
     assert.ok(interview.body.behavioralQuestions.length);
     assert.ok(interview.body.projectTalkingPoints.length);
@@ -459,6 +465,110 @@ describe('Career Assistant and Plan APIs', () => {
     assert.ok(interview.body.questions.some((item) => item.category === 'ROLE_SPECIFIC'));
     assert.equal(interview.body.readiness.status, 'NEEDS_PRACTICE');
     assert.ok(interview.body.recommendedPracticeAreas.some((item) => /Docker|Kubernetes/.test(item)));
+  });
+
+  it('grounds project recommendations in owner data, saved market counts, existing projects, and the active plan', async () => {
+    models.planModel.records.push({
+      user: OWNER_ID,
+      status: 'ACTIVE',
+      updatedAt: new Date('2025-03-02T00:00:00.000Z'),
+      careerGoal: 'Backend Engineer',
+      items: [{ itemType: 'PROJECT', title: 'Containerize the inventory API', skills: ['Docker'], completed: false }],
+    });
+    models.resumeModel.records.push({
+      _id: '3'.repeat(24),
+      user: OTHER_ID,
+      createdAt: new Date('2025-03-03T00:00:00.000Z'),
+      detectedSkills: ['Ruby'],
+      detectedProjects: ['Foreign private inventory project'],
+      jobSpecificAnalysis: { missingSkills: ['Ruby'] },
+    });
+    models.jobModel.records.push({
+      _id: '4'.repeat(24),
+      user: OTHER_ID,
+      createdAt: new Date('2025-03-03T00:00:00.000Z'),
+      jobTitle: 'Foreign private role',
+      missingSkills: ['Ruby'],
+    });
+    models.planModel.records.push({
+      user: OTHER_ID,
+      status: 'ACTIVE',
+      updatedAt: new Date('2025-03-03T00:00:00.000Z'),
+      items: [{ itemType: 'PROJECT', title: 'Foreign private plan', skills: ['Ruby'], completed: false }],
+    });
+
+    const response = await request(app)
+      .post('/api/career-assistant/projects')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const body = JSON.stringify(response.body);
+
+    assert.equal(response.status, 200);
+    assert.match(body, /Inventory tracking API/);
+    assert.match(body, /Containerize the inventory API/);
+    assert.match(body, /Kubernetes/);
+    assert.doesNotMatch(body, /Ruby|Foreign private/);
+    assert.equal(response.body.recommendations[0].marketEvidence[0].source, 'Saved Resume Analyzer job-market snapshot');
+    assert.equal(response.body.recommendations[0].careerPlanAlignment.length, 1);
+    assert.deepEqual(response.body.recommendations[0].extendsProjects, ['Inventory tracking API']);
+  });
+
+  it('returns no invented project or skills when saved career context is unavailable', async () => {
+    models.userModel.records.get(OWNER_ID).profile.careerGoal = null;
+    models.userModel.records.get(OWNER_ID).profile.skills = [];
+    models.resumeModel.records.length = 0;
+    models.jobModel.records.length = 0;
+
+    const response = await request(app)
+      .post('/api/career-assistant/projects')
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.recommendations, []);
+    assert.equal(response.body.targetRole, null);
+    assert.ok(response.body.contextNotice);
+    assert.deepEqual(response.body.availableFocusSkills, []);
+  });
+
+  it('validates project filters and accepts only skills in the authenticated context', async () => {
+    const invalidSkill = await request(app)
+      .post('/api/career-assistant/projects')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ focusSkill: 'Ruby' });
+    const invalidCategory = await request(app)
+      .post('/api/career-assistant/projects')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ category: 'UNRELATED' });
+    const focused = await request(app)
+      .post('/api/career-assistant/projects')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ focusSkill: 'Kubernetes', difficulty: 'ADVANCED', category: 'CLOUD_DEVOPS' });
+
+    safeError(invalidSkill, 400);
+    safeError(invalidCategory, 400);
+    assert.equal(focused.status, 200);
+    assert.ok(focused.body.recommendations.length);
+    assert.equal(focused.body.recommendations[0].difficulty, 'ADVANCED');
+    assert.ok(focused.body.recommendations[0].skillsToDevelop.includes('Kubernetes'));
+
+    let providerCalls = 0;
+    const dependencies = {
+      ...models,
+      aiProvider: {
+        async recommendProjects() {
+          providerCalls += 1;
+          return { recommendations: [] };
+        },
+      },
+      authenticateToken: (token) => extractAuthentication(token, testEnvironment),
+      userModel: models.userModel,
+    };
+    const strictApp = createApp({ authDependencies: dependencies, careerDependencies: dependencies });
+    const rejectedBeforeProvider = await request(strictApp)
+      .post('/api/career-assistant/projects')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ focusSkill: 'Ruby' });
+    safeError(rejectedBeforeProvider, 400);
+    assert.equal(providerCalls, 0);
   });
 
   it('limits interview questions and practice recommendations to the authenticated user data', async () => {
@@ -583,6 +693,27 @@ describe('Career Assistant and Plan APIs', () => {
     const failingApp = createApp({ authDependencies: dependencies, careerDependencies: dependencies });
     const response = await request(failingApp)
       .post('/api/career-assistant/interview-preparation')
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    safeError(response, 503);
+    assert.doesNotMatch(JSON.stringify(response.body), /AI_PROVIDER_FAILED|api.?key/i);
+  });
+
+  it('surfaces project provider failures without leaking provider configuration', async () => {
+    const failingProvider = {
+      recommendProjects: async () => {
+        throw new Error('safe provider failure', { cause: 'AI_PROVIDER_FAILED' });
+      },
+    };
+    const dependencies = {
+      ...models,
+      aiProvider: failingProvider,
+      authenticateToken: (token) => extractAuthentication(token, testEnvironment),
+      userModel: models.userModel,
+    };
+    const failingApp = createApp({ authDependencies: dependencies, careerDependencies: dependencies });
+    const response = await request(failingApp)
+      .post('/api/career-assistant/projects')
       .set('Authorization', `Bearer ${ownerToken}`);
 
     safeError(response, 503);
@@ -786,7 +917,21 @@ describe('AI provider selection and OpenAI-compatible mapping', () => {
       { actions: ['Practice Docker'] },
       { weakAreas: ['Metrics'], missingContent: ['Add truthful metrics'], strongerWordingSuggestions: ['Quantify outcomes'] },
       { stages: [{ name: 'SHORT_TERM', objective: 'Learn a skill.', actions: ['Practice Docker'], skills: ['Docker'] }] },
-      { recommendations: [{ title: 'Docker demo', description: 'Build a demo.', skills: ['Docker'], rationale: 'Shows applied skill.' }] },
+      { recommendations: [{
+        title: 'Docker demo',
+        description: 'Build a demo.',
+        category: 'CLOUD_DEVOPS',
+        difficulty: 'BEGINNER',
+        skills: ['Docker'],
+        skillsToDevelop: ['Docker'],
+        skillsToDemonstrate: [],
+        technologyStack: ['Docker'],
+        expectedOutcome: 'A tested demo.',
+        resumeValue: ['Demonstrates applied Docker use.'],
+        phases: [{ name: 'Build', tasks: ['Implement and test the demo.'] }],
+        extendsProjects: [],
+        rationale: 'Shows applied skill.',
+      }] },
       {
         technicalTopics: ['Docker'],
         behavioralQuestions: ['Describe a challenge.'],
@@ -832,7 +977,9 @@ describe('AI provider selection and OpenAI-compatible mapping', () => {
     assert.deepEqual(await provider.generateActionPlan(context), results[0]);
     assert.deepEqual(await provider.improveResume(context), results[1]);
     assert.deepEqual(await provider.generateCareerRoadmap(context), results[2]);
-    assert.deepEqual(await provider.recommendProjects(context), results[3]);
+    const projects = await provider.recommendProjects(context);
+    assert.equal(projects.recommendations[0].title, 'Docker demo');
+    assert.deepEqual(projects.recommendations[0].technologyStack, ['Docker']);
     assert.deepEqual(await provider.prepareForInterview(context), results[4]);
     assert.equal(requestCount, 5);
   });

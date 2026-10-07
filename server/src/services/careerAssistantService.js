@@ -21,6 +21,9 @@ const INTERVIEW_CATEGORIES = new Set([
   'SITUATIONAL',
   'HR',
 ]);
+const PROJECT_CATEGORIES = new Set(['BACKEND', 'FRONTEND', 'FULL_STACK', 'AI_ML', 'DATA', 'CLOUD_DEVOPS', 'GENERAL']);
+const PROJECT_DIFFICULTIES = new Set(['BEGINNER', 'INTERMEDIATE', 'ADVANCED']);
+const PROJECT_PREFERENCE_KEYS = new Set(['category', 'difficulty', 'focusSkill']);
 const INTERVIEW_STOP_WORDS = new Set([
   'about', 'after', 'also', 'and', 'are', 'can', 'could', 'describe', 'does', 'explain',
   'for', 'from', 'have', 'how', 'into', 'that', 'the', 'their', 'then', 'this', 'through',
@@ -322,6 +325,196 @@ function evaluateInterviewAnswer(input) {
   };
 }
 
+function projectSkillData(context) {
+  const gaps = new Map();
+  const addGaps = (items, source) => {
+    for (const value of items) {
+      const skill = typeof value === 'string' ? value.trim() : '';
+      if (!skill) continue;
+      const key = skill.toLocaleLowerCase();
+      const entry = gaps.get(key) ?? { skill, sources: [] };
+      if (!entry.sources.includes(source)) entry.sources.push(source);
+      gaps.set(key, entry);
+    }
+  };
+  addGaps(context.latestJobMissingSkills ?? [], 'Job Intelligence');
+  addGaps(context.resumeJobFitMissingSkills ?? [], 'Resume Analyzer job fit');
+  addGaps((context.latestJobSkillGaps ?? []).map((item) => item.skill), 'Job Intelligence');
+  addGaps((context.jobMarketSkillGaps ?? []).map((item) => item.skill), 'saved job-market snapshot');
+  const skills = uniqueText([...(context.skills ?? []), ...(context.resumeDetectedSkills ?? [])]);
+  const marketCounts = new Map((context.jobMarketSkillGaps ?? [])
+    .filter((item) => typeof item.skill === 'string' && Number.isSafeInteger(item.jobCount) && item.jobCount > 0)
+    .map((item) => [item.skill.toLocaleLowerCase(), { skill: item.skill, jobCount: item.jobCount }]));
+  return { gaps, skills, marketCounts };
+}
+
+function validateProjectPreferences(input) {
+  if (input == null) return {};
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw createError('Project recommendation preferences must be an object', 400);
+  }
+  if (Object.keys(input).some((key) => !PROJECT_PREFERENCE_KEYS.has(key))) {
+    throw createError('Project recommendation preferences contain an unsupported field', 400);
+  }
+  const preferences = {};
+  if (input.category != null) {
+    if (!PROJECT_CATEGORIES.has(input.category)) throw createError('Project category is invalid', 400);
+    preferences.category = input.category;
+  }
+  if (input.difficulty != null) {
+    if (!PROJECT_DIFFICULTIES.has(input.difficulty)) throw createError('Project difficulty is invalid', 400);
+    preferences.difficulty = input.difficulty;
+  }
+  if (input.focusSkill != null) {
+    if (typeof input.focusSkill !== 'string' || input.focusSkill.trim().length === 0 || input.focusSkill.length > 100) {
+      throw createError('Focus skill must be a non-empty string of at most 100 characters', 400);
+    }
+    preferences.focusSkill = input.focusSkill.trim();
+  }
+  return preferences;
+}
+
+function normalizedProjectPhases(phases) {
+  if (!Array.isArray(phases)) return [];
+  return phases
+    .filter((phase) => typeof phase?.name === 'string' && phase.name.trim())
+    .slice(0, 7)
+    .map((phase) => ({
+      name: phase.name.trim().slice(0, 100),
+      tasks: uniqueText(Array.isArray(phase.tasks) ? phase.tasks : []).slice(0, 5).map((task) => task.slice(0, 300)),
+    }))
+    .filter((phase) => phase.tasks.length > 0);
+}
+
+function enrichProjectRecommendations(context, result, preferences = {}) {
+  const { gaps, skills: savedSkills, marketCounts } = projectSkillData(context);
+  const targetRole = context.careerGoal ?? context.resumeTargetRole ?? context.latestJobTitle ?? null;
+  const activePlanItems = Array.isArray(context.activeCareerPlanItems) ? context.activeCareerPlanItems : [];
+  const availableFocusSkills = uniqueText([
+    ...savedSkills,
+    ...[...gaps.values()].map((gap) => gap.skill),
+  ]);
+  const hasContext = Boolean(targetRole || availableFocusSkills.length || context.resumeProjects?.length);
+  if (preferences.focusSkill
+      && !availableFocusSkills.some((skill) => skill.toLocaleLowerCase() === preferences.focusSkill.toLocaleLowerCase())) {
+    throw createError('Focus skill must match a skill in your saved profile or analysis', 400);
+  }
+  const contextAvailability = {
+    targetRole: Boolean(targetRole),
+    profileSkills: (context.skills ?? []).length > 0,
+    resumeSkills: (context.resumeDetectedSkills ?? []).length > 0,
+    resumeProjects: (context.resumeProjects ?? []).length > 0,
+    resumeJobFit: Boolean((context.resumeJobFitMissingSkills ?? []).length || context.resumeJobFitScore != null),
+    jobIntelligence: Boolean(context.latestJobTitle || (context.latestJobMissingSkills ?? []).length),
+    jobMarketSnapshot: context.jobMarketStatus === 'available',
+    careerPlan: activePlanItems.length > 0,
+  };
+  const missing = [];
+  if (!targetRole) missing.push('a saved target role');
+  if (gaps.size === 0) missing.push('saved skill-gap evidence');
+  if ((context.resumeProjects ?? []).length === 0) missing.push('resume project examples');
+  const contextNotice = missing.length
+    ? `Some personalization context is unavailable: ${missing.join(', ')}. Recommendations will use only the saved information available.`
+    : null;
+  const candidates = hasContext && Array.isArray(result?.recommendations) ? result.recommendations : [];
+  const recommendations = candidates
+    .filter((candidate) => typeof candidate?.title === 'string' && candidate.title.trim()
+      && typeof candidate.description === 'string' && candidate.description.trim())
+    .map((candidate) => {
+      const category = PROJECT_CATEGORIES.has(candidate.category) ? candidate.category : 'GENERAL';
+      const suppliedGaps = uniqueText([
+        ...(Array.isArray(candidate.skillsToDevelop) ? candidate.skillsToDevelop : []),
+        ...(Array.isArray(candidate.addressesSkillGaps) ? candidate.addressesSkillGaps : []),
+        ...(Array.isArray(candidate.skills) ? candidate.skills : []),
+      ]);
+      const skillsToDevelop = suppliedGaps
+        .map((skill) => gaps.get(skill.toLocaleLowerCase())?.skill)
+        .filter(Boolean)
+        .slice(0, 5);
+      const skillsToDemonstrate = uniqueText([
+        ...(Array.isArray(candidate.skillsToDemonstrate) ? candidate.skillsToDemonstrate : []),
+        ...(Array.isArray(candidate.skills) ? candidate.skills : []),
+      ]).filter((skill) => savedSkills.some((known) => known.toLocaleLowerCase() === skill.toLocaleLowerCase())).slice(0, 5);
+      const marketEvidence = skillsToDevelop
+        .map((skill) => marketCounts.get(skill.toLocaleLowerCase()))
+        .filter(Boolean)
+        .map(({ skill, jobCount }) => ({
+          skill,
+          jobCount,
+          source: 'Saved Resume Analyzer job-market snapshot',
+        }));
+      const alignedPlanItems = activePlanItems
+        .filter((item) => {
+          const planSkills = Array.isArray(item.skills) ? item.skills : [];
+          return planSkills.some((skill) => skillsToDevelop.some((gap) => gap.toLocaleLowerCase() === skill.toLocaleLowerCase()));
+        })
+        .slice(0, 4)
+        .map((item) => ({
+          title: item.title,
+          itemType: item.itemType,
+          completed: item.completed === true,
+        }));
+      const sourceSummary = [...new Set(skillsToDevelop.flatMap((skill) => gaps.get(skill.toLocaleLowerCase())?.sources ?? []))];
+      const whyRecommended = skillsToDevelop.length
+        ? `Addresses saved skill gaps (${skillsToDevelop.join(', ')}) identified by ${sourceSummary.join(' and ')}.`
+        : skillsToDemonstrate.length
+          ? `Builds further evidence using skills already saved in your profile or resume: ${skillsToDemonstrate.join(', ')}.`
+          : 'Provides a scoped portfolio exercise based on your saved career context; no specific skill gap is recorded for this recommendation.';
+      const rationale = [
+        targetRole ? `Aligned with your saved target role: ${targetRole}.` : 'No target role is saved.',
+        whyRecommended,
+        marketEvidence.length
+          ? `The saved job-market snapshot lists ${marketEvidence.map((item) => `${item.skill} in ${item.jobCount} postings`).join(', ')}.`
+          : 'No matching saved job-market count is available for these skills.',
+      ].join(' ');
+      const safeList = (items, max, maxLength = 300) => uniqueText(Array.isArray(items) ? items : [])
+        .slice(0, max).map((item) => item.slice(0, maxLength));
+      const technologyStack = safeList(candidate.technologyStack, 6, 100);
+      const phases = normalizedProjectPhases(candidate.phases);
+      const extendsProjects = safeList(candidate.extendsProjects, 3, 200)
+        .filter((project) => (context.resumeProjects ?? []).includes(project));
+      return {
+        title: candidate.title.trim().slice(0, 160),
+        description: candidate.description.trim().slice(0, 1500),
+        category,
+        targetRole,
+        roleRelevance: targetRole
+          ? `Suggested for your saved ${targetRole} direction. This is a project proposal, not a claim about your current qualifications.`
+          : 'A project proposal based on saved skills; no target role is currently saved.',
+        difficulty: preferences.difficulty
+          ?? (PROJECT_DIFFICULTIES.has(candidate.difficulty) ? candidate.difficulty : 'INTERMEDIATE'),
+        technologyStack,
+        expectedOutcome: typeof candidate.expectedOutcome === 'string'
+          ? candidate.expectedOutcome.trim().slice(0, 500)
+          : 'A working project with a documented scope and verifiable results.',
+        resumeValue: safeList(candidate.resumeValue, 5),
+        skillsToDevelop,
+        skillsToDemonstrate,
+        addressesSkillGaps: skillsToDevelop,
+        skills: uniqueText([...skillsToDevelop, ...skillsToDemonstrate]),
+        marketEvidence,
+        extendsProjects,
+        careerPlanAlignment: alignedPlanItems,
+        phases,
+        whyRecommended,
+        rationale,
+      };
+    })
+    .filter((recommendation) => !preferences.category || recommendation.category === preferences.category)
+    .filter((recommendation) => !preferences.focusSkill
+      || recommendation.skillsToDevelop.some((skill) => skill.toLocaleLowerCase() === preferences.focusSkill.toLocaleLowerCase())
+      || recommendation.skillsToDemonstrate.some((skill) => skill.toLocaleLowerCase() === preferences.focusSkill.toLocaleLowerCase()))
+    .slice(0, 3);
+  return {
+    recommendations,
+    targetRole,
+    availableFocusSkills,
+    contextAvailability,
+    contextNotice,
+    preferences,
+  };
+}
+
 export function createCareerAssistantService({
   conversationModel = CareerAssistantConversation,
   messageModel = CareerAssistantMessage,
@@ -356,13 +549,32 @@ export function createCareerAssistantService({
   }
 
   async function withContext(user, method, ...args) {
-    const [context, selectedProvider] = await Promise.all([
-      resolvedContextService.buildForUser(user),
-      Promise.resolve(getProvider()),
-    ]);
-    try {
+      const context = await resolvedContextService.buildForUser(user);
+      if (method === 'recommendProjects') {
+        const preferences = args[0] ?? {};
+        const { gaps, skills } = projectSkillData(context);
+        const savedFocusSkills = uniqueText([...skills, ...[...gaps.values()].map((gap) => gap.skill)]);
+        if (preferences.focusSkill
+            && !savedFocusSkills.some((skill) => skill.toLocaleLowerCase() === preferences.focusSkill.toLocaleLowerCase())) {
+          throw createError('Focus skill must match a skill in your saved profile or analysis', 400);
+        }
+        const hasSavedContext = Boolean(
+          context.careerGoal
+          || context.resumeTargetRole
+          || context.latestJobTitle
+          || savedFocusSkills.length
+          || context.resumeProjects?.length,
+        );
+        if (!hasSavedContext) {
+          return enrichProjectRecommendations(context, { recommendations: [] }, preferences);
+        }
+      }
+      const selectedProvider = getProvider();
+      try {
       const result = await selectedProvider[method](context, ...args);
-      return method === 'prepareForInterview' ? enrichInterviewPreparation(context, result) : result;
+      if (method === 'prepareForInterview') return enrichInterviewPreparation(context, result);
+      if (method === 'recommendProjects') return enrichProjectRecommendations(context, result, args[0] ?? {});
+      return result;
     } catch (cause) {
       if (cause?.cause?.startsWith?.('AI_PROVIDER_')) {
         throw createError(cause.message, 503);
@@ -433,7 +645,7 @@ export function createCareerAssistantService({
     generateActionPlan: (user) => withContext(user, 'generateActionPlan'),
     improveResume: (user) => withContext(user, 'improveResume'),
     generateRoadmap: (user) => withContext(user, 'generateCareerRoadmap'),
-    recommendProjects: (user) => withContext(user, 'recommendProjects'),
+    recommendProjects: (user, input) => withContext(user, 'recommendProjects', validateProjectPreferences(input)),
     prepareForInterview: (user) => withContext(user, 'prepareForInterview'),
     evaluateInterviewAnswer: (_user, input) => evaluateInterviewAnswer(input),
   };

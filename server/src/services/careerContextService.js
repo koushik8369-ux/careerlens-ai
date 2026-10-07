@@ -89,6 +89,8 @@ export function createCareerContextService({
         resumeSuggestions: limitStrings(resume?.improvementSuggestions, MAX_RESUME_SUGGESTIONS),
         resumeTargetRole: cleanText(resume?.targetRole),
         resumeJobFitScore: scoreValue(resume?.matchScore ?? resumeJobFit?.jobFitScore),
+        resumeJobFitRequiredSkills: limitStrings(resumeJobFit?.requiredSkills, MAX_JOB_SKILLS),
+        resumeJobFitMatchedSkills: limitStrings(resumeJobFit?.matchedSkills, MAX_JOB_SKILLS),
         resumeJobFitMissingSkills: limitStrings(resumeJobFit?.missingSkills, MAX_JOB_SKILLS),
         latestJobTitle: cleanText(job?.jobTitle),
         latestJobCompany: cleanText(job?.companyName),

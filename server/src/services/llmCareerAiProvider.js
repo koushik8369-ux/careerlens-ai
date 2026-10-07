@@ -44,6 +44,8 @@ function contextPrompt(context) {
     resumeSuggestions: context.resumeSuggestions,
     resumeTargetRole: context.resumeTargetRole,
     resumeJobFitScore: context.resumeJobFitScore,
+    resumeJobFitRequiredSkills: context.resumeJobFitRequiredSkills,
+    resumeJobFitMatchedSkills: context.resumeJobFitMatchedSkills,
     resumeJobFitMissingSkills: context.resumeJobFitMissingSkills,
     latestJobTitle: context.latestJobTitle,
     latestJobCompany: context.latestJobCompany,
@@ -111,14 +113,30 @@ export class LlmCareerAiProvider {
     };
   }
 
-  async recommendProjects(context) {
-    const result = await this.contextTask(context, 'Recommend practical, truthful portfolio projects.', '{"recommendations":[{"title":"string","description":"string","skills":["string"],"rationale":"string"}]}');
+  async recommendProjects(context, preferences = {}) {
+    const result = await this.contextTask(
+      context,
+      `Recommend up to three concrete portfolio projects from the supplied saved profile, resume, Job Intelligence, market snapshot and Career Plan context. Return the user's recorded skills separately from skills to develop; only use explicit saved gaps in skillsToDevelop. Treat technologyStack as suggested project choices, not current user qualifications. Do not invent market counts or claim an existing project unless it appears in resumeProjects. Prefer a distinct extension to a relevant existing resume project instead of duplicating it. Include actionable phases. Apply these preferences where supported: ${JSON.stringify(preferences)}.`,
+      '{"recommendations":[{"title":"string","description":"string","category":"BACKEND|FRONTEND|FULL_STACK|AI_ML|DATA|CLOUD_DEVOPS|GENERAL","difficulty":"BEGINNER|INTERMEDIATE|ADVANCED","skills":["string"],"skillsToDevelop":["string"],"skillsToDemonstrate":["string"],"technologyStack":["string"],"expectedOutcome":"string","resumeValue":["string"],"phases":[{"name":"string","tasks":["string"]}],"extendsProjects":["exact saved resume project title"],"rationale":"string"}]}',
+    );
     if (!Array.isArray(result.recommendations) || result.recommendations.length === 0) throw this.invalidResponse();
     return {
       recommendations: result.recommendations.map((recommendation) => ({
         title: this.requiredText(recommendation, 'title'),
         description: this.requiredText(recommendation, 'description'),
         skills: this.requiredStringList(recommendation, 'skills'),
+        skillsToDevelop: this.requiredStringList(recommendation, 'skillsToDevelop'),
+        skillsToDemonstrate: this.requiredStringList(recommendation, 'skillsToDemonstrate'),
+        technologyStack: this.requiredStringList(recommendation, 'technologyStack'),
+        expectedOutcome: this.requiredText(recommendation, 'expectedOutcome'),
+        resumeValue: this.requiredStringList(recommendation, 'resumeValue'),
+        phases: Array.isArray(recommendation.phases) ? recommendation.phases.map((phase) => ({
+          name: this.requiredText(phase, 'name'),
+          tasks: this.requiredStringList(phase, 'tasks'),
+        })) : [],
+        extendsProjects: this.requiredStringList(recommendation, 'extendsProjects'),
+        category: this.requiredText(recommendation, 'category'),
+        difficulty: this.requiredText(recommendation, 'difficulty'),
         rationale: this.requiredText(recommendation, 'rationale'),
       })),
     };

@@ -22,6 +22,7 @@ The active API is in `server/`. The original Spring Boot/MySQL implementation in
 - Job Intelligence: deterministic job description analysis, skill matching, recommendations, and history
 - Career Assistant conversations grounded in owner-scoped profile, resume, job-fit, market snapshot, and active-plan context; deterministic by default with suggested follow-ups and bounded conversation history in LLM mode
 - Resume improvement, skill roadmap, project recommendations, and career action plan
+- Project Recommendations refine the existing Career Assistant endpoint with saved skill gaps, role context, existing resume projects, Career Plan alignment, actionable phases, and only available saved market counts; project scope and focus filters are optional
 - Interview Preparation uses saved role, resume, job-fit, and Career Plan context for categorized questions, text-based answer-structure feedback, and a mock-interview flow; it does not score technical correctness
 - Career plan generation grounded in saved profile, resume, job-fit, and available market-gap evidence, with stage-based tasks, tracked progress, and archival of the previous active plan
 - Optional OpenAI-compatible career AI provider; deterministic behavior is the default

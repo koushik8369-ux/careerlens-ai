@@ -280,12 +280,69 @@ export interface CareerRoadmapResult {
 export interface ProjectRecommendation {
   title: string;
   description: string;
+  category: ProjectRecommendationCategory;
+  targetRole: string | null;
+  roleRelevance: string;
+  difficulty: ProjectRecommendationDifficulty;
+  technologyStack: string[];
+  expectedOutcome: string;
+  resumeValue: string[];
+  skillsToDevelop: string[];
+  skillsToDemonstrate: string[];
+  addressesSkillGaps: string[];
   skills: string[];
   rationale: string;
+  whyRecommended: string;
+  marketEvidence: Array<{
+    skill: string;
+    jobCount: number;
+    source: string;
+  }>;
+  extendsProjects: string[];
+  careerPlanAlignment: Array<{
+    title: string;
+    itemType: string | null;
+    completed: boolean;
+  }>;
+  phases: Array<{
+    name: string;
+    tasks: string[];
+  }>;
 }
 
 export interface ProjectRecommendationResult {
   recommendations: ProjectRecommendation[];
+  targetRole: string | null;
+  availableFocusSkills: string[];
+  contextAvailability: {
+    targetRole: boolean;
+    profileSkills: boolean;
+    resumeSkills: boolean;
+    resumeProjects: boolean;
+    resumeJobFit: boolean;
+    jobIntelligence: boolean;
+    jobMarketSnapshot: boolean;
+    careerPlan: boolean;
+  };
+  contextNotice: string | null;
+  preferences: ProjectRecommendationPreferences;
+}
+
+export type ProjectRecommendationCategory =
+  | 'BACKEND'
+  | 'FRONTEND'
+  | 'FULL_STACK'
+  | 'AI_ML'
+  | 'DATA'
+  | 'CLOUD_DEVOPS'
+  | 'GENERAL';
+
+export type ProjectRecommendationDifficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+
+export interface ProjectRecommendationPreferences {
+  category?: ProjectRecommendationCategory;
+  difficulty?: ProjectRecommendationDifficulty;
+  focusSkill?: string;
 }
 
 export interface InterviewPreparationResult {
