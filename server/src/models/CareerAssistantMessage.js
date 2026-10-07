@@ -5,6 +5,7 @@ const messageSchema = new mongoose.Schema({
   role: { type: String, enum: ['USER', 'ASSISTANT'], required: true },
   content: { type: String, required: true },
   provider: { type: String, default: null, maxlength: 50 },
+  followUpSuggestions: { type: [String], default: [] },
 }, {
   timestamps: { createdAt: true, updatedAt: false },
   versionKey: false,
@@ -18,7 +19,7 @@ const messageSchema = new mongoose.Schema({
   },
 });
 
-messageSchema.index({ conversation: 1, createdAt: 1 });
+messageSchema.index({ conversation: 1, createdAt: 1, _id: 1 });
 
 const CareerAssistantMessage = mongoose.models.CareerAssistantMessage
   || mongoose.model('CareerAssistantMessage', messageSchema);

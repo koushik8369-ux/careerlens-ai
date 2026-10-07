@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bot, Send, UserCircle2 } from 'lucide-react';
+import { Bot, Send, UserCircle2, Sparkles } from 'lucide-react';
 import type { CareerAssistantConversation, CareerAssistantMessage } from '../../types';
 
 interface CareerChatProps {
@@ -8,8 +8,15 @@ interface CareerChatProps {
   isLoading: boolean;
   isSending: boolean;
   error: string | null;
-  onSend: (question: string) => Promise<void>;
+  onSend: (question: string) => Promise<boolean>;
 }
+
+const STARTER_PROMPTS = [
+  'What skills am I missing for my target role?',
+  'How can I improve my resume?',
+  'What should I learn next?',
+  'Help me prepare for an interview.',
+];
 
 export const CareerChat: React.FC<CareerChatProps> = ({
   conversation,
@@ -26,38 +33,42 @@ export const CareerChat: React.FC<CareerChatProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
 
+  const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'ASSISTANT');
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedQuestion = question.trim();
-    if (!trimmedQuestion || isSending || !conversation) return;
-    await onSend(trimmedQuestion);
-    setQuestion('');
+    if (!trimmedQuestion || isSending) return;
+    if (await onSend(trimmedQuestion)) setQuestion('');
   };
-
-  if (!conversation) {
-    return (
-      <section className="glass-card min-h-[520px] flex flex-col items-center justify-center p-8 text-center">
-        <Bot className="w-10 h-10 text-brand-400 mb-4" />
-        <h2 className="text-lg font-semibold text-white">Choose a conversation</h2>
-        <p className="text-sm text-slate-400 mt-2 max-w-sm">Start a new conversation or select one from your history to ask a career question.</p>
-      </section>
-    );
-  }
 
   return (
     <section className="glass-card min-h-[520px] flex flex-col overflow-hidden">
       <header className="border-b border-slate-800/80 px-5 py-4">
-        <h2 className="font-semibold text-white truncate">{conversation.title}</h2>
-        <p className="text-xs text-slate-500 mt-1">Career guidance grounded in your saved profile</p>
+        <h2 className="font-semibold text-white truncate">{conversation?.title ?? 'Your career conversation'}</h2>
+        <p className="text-xs text-slate-500 mt-1">Career guidance grounded in your saved JOBFIT AI data</p>
       </header>
 
       <div className="flex-1 min-h-[360px] max-h-[58vh] overflow-y-auto p-5 space-y-4">
         {isLoading && <p className="text-sm text-slate-400 text-center py-8">Loading messages...</p>}
         {!isLoading && messages.length === 0 && (
-          <div className="h-full min-h-[280px] flex flex-col items-center justify-center text-center">
-            <Bot className="w-8 h-8 text-slate-500 mb-3" />
-            <p className="text-sm text-slate-300">Ask your first career question.</p>
-            <p className="text-xs text-slate-500 mt-1">Try asking about skills, your resume, or a career roadmap.</p>
+          <div className="min-h-[280px] flex flex-col items-center justify-center text-center">
+            <Bot className="w-8 h-8 text-brand-400 mb-3" />
+            <p className="text-sm font-medium text-slate-200">How can I help with your career?</p>
+            <p className="text-xs text-slate-500 mt-1">Choose a prompt or ask anything about your career direction.</p>
+            <div className="mt-5 flex max-w-xl flex-wrap justify-center gap-2">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => void onSend(prompt)}
+                  disabled={isSending}
+                  className="rounded-full border border-slate-700 bg-slate-800/50 px-3 py-2 text-left text-xs text-slate-300 transition hover:border-brand-500/50 hover:text-white disabled:opacity-50"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((message) => {
@@ -72,6 +83,22 @@ export const CareerChat: React.FC<CareerChatProps> = ({
             </div>
           );
         })}
+        {!isSending && latestAssistantMessage?.followUpSuggestions.length ? (
+          <div className="ml-8 flex flex-wrap gap-2" aria-label="Suggested follow-up questions">
+            <Sparkles className="mt-2 h-3.5 w-3.5 text-brand-400" />
+            {latestAssistantMessage.followUpSuggestions.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => void onSend(prompt)}
+                disabled={isSending}
+                className="rounded-full border border-brand-500/20 bg-brand-500/5 px-3 py-1.5 text-left text-xs text-brand-200 transition hover:bg-brand-500/15 disabled:opacity-50"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {isSending && <p className="text-xs text-slate-500 pl-8">Career Assistant is thinking...</p>}
         <div ref={messagesEndRef} />
       </div>
@@ -83,7 +110,8 @@ export const CareerChat: React.FC<CareerChatProps> = ({
           id="career-question"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Ask a career question..."
+          placeholder="Ask about your resume, skills, job fit, or next steps..."
+          maxLength={2000}
           disabled={isSending}
           className="min-w-0 flex-1 rounded-xl bg-slate-800/70 border border-slate-700 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/60"
         />

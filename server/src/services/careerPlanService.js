@@ -64,7 +64,12 @@ export function createCareerPlanService({
   contextService,
   aiProvider = createCareerAiProvider(),
 } = {}) {
-  const resolvedContextService = contextService ?? createCareerContextService({ userModel, resumeModel, jobModel });
+  const resolvedContextService = contextService ?? createCareerContextService({
+    userModel,
+    resumeModel,
+    jobModel,
+    planModel,
+  });
   async function getOwnedPlan(user, id) {
     if (!mongoose.isObjectIdOrHexString(id)) throw createError('Career plan was not found', 404);
     const plan = await planModel.findOne({ _id: id, user: user.id });

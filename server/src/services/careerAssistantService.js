@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import CareerAssistantConversation from '../models/CareerAssistantConversation.js';
 import CareerAssistantMessage from '../models/CareerAssistantMessage.js';
+import CareerPlan from '../models/CareerPlan.js';
 import JobAnalysis from '../models/JobAnalysis.js';
 import ResumeAnalysis from '../models/ResumeAnalysis.js';
 import User from '../models/User.js';
@@ -31,6 +32,9 @@ function messageResponse(message) {
     role: message.role,
     content: message.content,
     provider: message.provider ?? null,
+    followUpSuggestions: Array.isArray(message.followUpSuggestions)
+      ? message.followUpSuggestions.filter((item) => typeof item === 'string').slice(0, 4)
+      : [],
     createdAt: message.createdAt,
   };
 }
@@ -42,11 +46,17 @@ export function createCareerAssistantService({
   userModel = User,
   resumeModel = ResumeAnalysis,
   jobModel = JobAnalysis,
+  planModel = CareerPlan,
   aiProvider,
   env = process.env,
   fetchImpl,
 } = {}) {
-  const resolvedContextService = contextService ?? createCareerContextService({ userModel, resumeModel, jobModel });
+  const resolvedContextService = contextService ?? createCareerContextService({
+    userModel,
+    resumeModel,
+    jobModel,
+    planModel,
+  });
   let provider = aiProvider;
   function getProvider() {
     provider ??= createCareerAiProvider({ env, fetchImpl });
@@ -90,7 +100,7 @@ export function createCareerAssistantService({
 
     async getMessages(user, conversationId) {
       const conversation = await getOwnedConversation(user, conversationId);
-      const messages = await messageModel.find({ conversation: conversation._id }).sort({ createdAt: 1 });
+      const messages = await messageModel.find({ conversation: conversation._id }).sort({ createdAt: 1, _id: 1 });
       return messages.map(messageResponse);
     },
 
@@ -104,7 +114,13 @@ export function createCareerAssistantService({
         throw createError(`Question must not exceed ${MAX_QUESTION_LENGTH} characters`, 400);
       }
 
-      const answer = await withContext(user, 'answerCareerQuestion', normalizedQuestion);
+      const previousMessages = await messageModel.find({ conversation: conversation._id })
+        .sort({ createdAt: 1, _id: 1 });
+      const conversationHistory = previousMessages.slice(-10).map((message) => ({
+        role: message.role === 'USER' ? 'user' : 'assistant',
+        content: typeof message.content === 'string' ? message.content.slice(0, 4000) : '',
+      }));
+      const answer = await withContext(user, 'answerCareerQuestion', normalizedQuestion, conversationHistory);
       const selectedProvider = getProvider();
       const providerName = typeof selectedProvider.providerName === 'function'
         ? selectedProvider.providerName() || 'deterministic'
@@ -115,6 +131,9 @@ export function createCareerAssistantService({
         role: 'ASSISTANT',
         content: answer.answer,
         provider: providerName,
+        followUpSuggestions: Array.isArray(answer.followUpSuggestions)
+          ? answer.followUpSuggestions.filter((item) => typeof item === 'string').slice(0, 4)
+          : [],
       });
 
       if (conversation.title === DEFAULT_TITLE) {
