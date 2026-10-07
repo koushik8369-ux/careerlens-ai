@@ -34,6 +34,7 @@ export const sendCareerAssistantMessage = async (
   const response = await api.post<CareerAssistantMessage>(
     `/career-assistant/conversations/${conversationId}/messages`,
     request,
+    { timeout: 0 },
   );
   return response.data;
 };

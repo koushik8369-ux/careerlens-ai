@@ -62,6 +62,19 @@ function createCareerModels() {
       detectedProjects: ['CareerLens project'],
       missingSections: ['Certifications'],
       improvementSuggestions: ['Add measurable impact'],
+      targetRole: 'Backend Engineer',
+      matchScore: 78,
+      jobMarketInsights: {
+        status: 'available',
+        totalMatches: 12,
+        suitableRoles: [{ title: 'Backend Engineer', jobCount: 8 }],
+        commonSkills: [{ skill: 'Docker', jobCount: 6 }],
+        skillGaps: [{ skill: 'Kubernetes', jobCount: 4 }],
+      },
+      jobSpecificAnalysis: {
+        jobFitScore: 78,
+        missingSkills: ['Docker'],
+      },
       rawText: 'private resume data',
     },
   ];
@@ -94,8 +107,10 @@ function createCareerModels() {
   const userModel = {
     async findOne({ email }) { return [...users.values()].find((user) => user.email === email) ?? null; },
     async findById(id) { return users.get(String(id)) ?? null; },
+    records: users,
   };
   const resumeModel = {
+    records: resumes,
     findOne({ user }) {
       return createQuery(resumes
         .filter((record) => String(record.user) === String(user))
@@ -283,6 +298,64 @@ describe('Career Assistant and Plan APIs', () => {
     assert.equal(models.messageModel.records[0].content, 'What is my career goal?');
     assert.equal(models.conversationModel.records[0].title, 'What is my career goal?');
     assert.equal('conversation' in response.body, false);
+    assert.deepEqual(response.body.followUpSuggestions, ['Which skills support this goal?', 'What should I do next?']);
+    assert.deepEqual(models.messageModel.records[1].followUpSuggestions, response.body.followUpSuggestions);
+  });
+
+  it('answers skill-gap, resume, and market questions from the owner-scoped saved analysis', async () => {
+    const conversation = await request(app)
+      .post('/api/career-assistant/conversations')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const answer = async (question) => request(app)
+      .post(`/api/career-assistant/conversations/${conversation.body.id}/messages`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ question });
+
+    const skills = await answer('What skills am I missing for backend development?');
+    const resume = await answer('How can I improve my resume?');
+    const market = await answer('What job-market trends are relevant to me?');
+
+    assert.match(skills.body.content, /Docker/);
+    assert.match(skills.body.content, /Kubernetes/);
+    assert.match(resume.body.content, /Certifications/);
+    assert.match(resume.body.content, /Add measurable impact/);
+    assert.match(market.body.content, /12 postings/);
+    assert.match(market.body.content, /Backend Engineer \(8\)/);
+    assert.match(market.body.content, /not evidence of how demand has changed/);
+    assert.equal(JSON.stringify([skills.body, resume.body, market.body]).includes('private resume data'), false);
+  });
+
+  it('clearly reports unavailable user context without exposing another owner’s data', async () => {
+    const conversation = await request(app)
+      .post('/api/career-assistant/conversations')
+      .set('Authorization', `Bearer ${otherToken}`);
+    const response = await request(app)
+      .post(`/api/career-assistant/conversations/${conversation.body.id}/messages`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({ question: 'How can I improve my resume?' });
+
+    assert.equal(response.status, 200);
+    assert.match(response.body.content, /No saved resume-analysis findings/);
+    assert.match(response.body.content, /job-market snapshot/);
+    assert.doesNotMatch(response.body.content, /Career Owner|Docker|private resume data/);
+  });
+
+  it('uses the owner’s active career plan to answer next-step questions', async () => {
+    const plan = await request(app)
+      .post('/api/career-plans')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const conversation = await request(app)
+      .post('/api/career-assistant/conversations')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const response = await request(app)
+      .post(`/api/career-assistant/conversations/${conversation.body.id}/messages`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ question: 'What is next in my career plan?' });
+
+    assert.equal(plan.status, 200);
+    assert.equal(response.status, 200);
+    assert.match(response.body.content, /active career plan/);
+    assert.match(response.body.content, new RegExp(plan.body.items[0].title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
   it('returns messages in creation order and rejects cross-user conversation reads', async () => {
@@ -293,6 +366,10 @@ describe('Career Assistant and Plan APIs', () => {
       .post(`/api/career-assistant/conversations/${conversation.body.id}/messages`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ question: 'What should I learn?' });
+    await request(app)
+      .post(`/api/career-assistant/conversations/${conversation.body.id}/messages`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ question: 'How can I practice those skills?' });
 
     const messages = await request(app)
       .get(`/api/career-assistant/conversations/${conversation.body.id}/messages`)
@@ -302,7 +379,11 @@ describe('Career Assistant and Plan APIs', () => {
       .set('Authorization', `Bearer ${otherToken}`);
 
     assert.equal(messages.status, 200);
-    assert.deepEqual(messages.body.map((message) => message.role), ['USER', 'ASSISTANT']);
+    assert.deepEqual(messages.body.map((message) => message.role), ['USER', 'ASSISTANT', 'USER', 'ASSISTANT']);
+    assert.deepEqual(messages.body.filter((message) => message.role === 'USER').map((message) => message.content), [
+      'What should I learn?',
+      'How can I practice those skills?',
+    ]);
     safeError(foreign, 404);
   });
 
@@ -471,6 +552,9 @@ describe('AI provider selection and OpenAI-compatible mapping', () => {
       resumeProjects: [],
       resumeMissingSections: [],
       resumeSuggestions: [],
+      resumeTargetRole: 'Backend Engineer',
+      resumeJobFitScore: 78,
+      resumeJobFitMissingSkills: ['Docker'],
       latestJobTitle: null,
       latestJobCompany: null,
       latestJobOverallScore: null,
@@ -479,13 +563,26 @@ describe('AI provider selection and OpenAI-compatible mapping', () => {
       latestJobMatchedSkills: [],
       latestJobMissingSkills: [],
       latestJobSkillGaps: [],
-    }, 'What should I learn?');
+      jobMarketStatus: 'available',
+      jobMarketTotalMatches: 12,
+      jobMarketSuitableRoles: [{ title: 'Backend Engineer', jobCount: 8 }],
+      jobMarketCommonSkills: [{ skill: 'Docker', jobCount: 6 }],
+      jobMarketSkillGaps: [{ skill: 'Kubernetes', jobCount: 4 }],
+      activeCareerPlanGoal: 'Backend Engineer',
+      activeCareerPlanItems: [{ title: 'Build an API', completed: false }],
+    }, 'What should I learn?', [
+      { role: 'user', content: 'How can I improve my resume?' },
+      { role: 'assistant', content: 'Your saved analysis recommends measurable impact.' },
+    ]);
 
     assert.deepEqual(result, { answer: 'Focus on verified skills.', followUpSuggestions: ['What next?'] });
     assert.equal(requests.length, 1);
     assert.equal(requests[0].url, 'https://llm.example.test/v1/chat/completions');
     assert.equal(JSON.parse(requests[0].options.body).model, 'test-model');
     assert.match(JSON.parse(requests[0].options.body).messages[1].content, /Backend Engineer/);
+    assert.match(JSON.parse(requests[0].options.body).messages[1].content, /ConversationHistory/);
+    assert.match(JSON.parse(requests[0].options.body).messages[1].content, /jobMarketTotalMatches/);
+    assert.doesNotMatch(JSON.stringify(JSON.parse(requests[0].options.body)), new RegExp(llmEnvironment.LLM_API_KEY));
   });
 
   it('maps every optional LLM tool contract using only a mocked fetch implementation', async () => {

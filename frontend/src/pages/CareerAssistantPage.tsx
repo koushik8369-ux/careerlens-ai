@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Bot, BriefcaseBusiness, FileText, GraduationCap, Loader2, MessageSquarePlus, Route, Sparkles, Target } from 'lucide-react';
 import axios from 'axios';
 import { CareerChat } from '../components/career/CareerChat';
@@ -37,6 +37,7 @@ export const CareerAssistantPage: React.FC = () => {
   const [selected, setSelected] = useState<CareerAssistantConversation | null>(null);
   const [messages, setMessages] = useState<CareerAssistantMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isImprovementLoading, setIsImprovementLoading] = useState(false);
@@ -55,6 +56,7 @@ export const CareerAssistantPage: React.FC = () => {
   const [actionPlan, setActionPlan] = useState<CareerActionPlanResult | null>(null);
   const [actionPlanError, setActionPlanError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const messageLoadSequence = useRef(0);
 
   const loadConversations = async () => {
     setIsLoading(true);
@@ -75,16 +77,20 @@ export const CareerAssistantPage: React.FC = () => {
   useEffect(() => {
     if (!selected) { setMessages([]); return; }
     let mounted = true;
+    const requestSequence = ++messageLoadSequence.current;
     setIsMessagesLoading(true);
     setError(null);
     getCareerAssistantMessages(selected.id)
-      .then((result) => { if (mounted) setMessages(result); })
+      .then((result) => {
+        if (mounted && requestSequence === messageLoadSequence.current) setMessages(result);
+      })
       .catch((err: unknown) => { if (mounted) setError(errorMessage(err, 'Unable to load messages.')); })
       .finally(() => { if (mounted) setIsMessagesLoading(false); });
     return () => { mounted = false; };
   }, [selected]);
 
   const handleNewConversation = async () => {
+    setIsCreatingConversation(true);
     setError(null);
     try {
       const conversation = await createCareerAssistantConversation();
@@ -92,23 +98,43 @@ export const CareerAssistantPage: React.FC = () => {
       setSelected(conversation);
     } catch (err: unknown) {
       setError(errorMessage(err, 'Unable to create a new conversation.'));
+    } finally {
+      setIsCreatingConversation(false);
     }
   };
 
-  const handleSend = async (question: string) => {
-    if (!selected) return;
+  const handleSend = async (question: string): Promise<boolean> => {
     setIsSending(true);
     setError(null);
     try {
-      const assistantMessage = await sendCareerAssistantMessage(selected.id, { question });
+      const activeConversation = selected ?? await createCareerAssistantConversation();
+      if (!selected) {
+        setConversations((current) => [activeConversation, ...current]);
+        setSelected(activeConversation);
+      }
+      const assistantMessage = await sendCareerAssistantMessage(activeConversation.id, { question });
+      const now = new Date().toISOString();
       setMessages((current) => [
         ...current,
-        { id: Date.now().toString(), role: 'USER', content: question, provider: null, createdAt: new Date().toISOString() },
+        { id: `local-${crypto.randomUUID()}`, role: 'USER', content: question, provider: null, followUpSuggestions: [], createdAt: now },
         assistantMessage,
       ]);
-      await loadConversations();
+      messageLoadSequence.current += 1;
+      setConversations((current) => current
+        .map((item) => item.id === activeConversation.id
+          ? {
+            ...item,
+            title: item.title === 'Career Assistant'
+              ? question.length <= 200 ? question : `${question.slice(0, 197)}...`
+              : item.title,
+            updatedAt: assistantMessage.createdAt,
+          }
+          : item)
+        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()));
+      return true;
     } catch (err: unknown) {
       setError(errorMessage(err, 'Unable to send your question.'));
+      return false;
     } finally {
       setIsSending(false);
     }
@@ -181,21 +207,20 @@ export const CareerAssistantPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3"><Bot className="w-7 h-7 text-brand-400" /> Career Assistant</h1>
           <p className="text-sm text-slate-400 mt-1">Ask focused questions about your career direction and next steps.</p>
         </div>
-        <button type="button" onClick={() => void handleNewConversation()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 transition">
-          <MessageSquarePlus className="w-4 h-4" /> New conversation
+        <button type="button" onClick={() => void handleNewConversation()} disabled={isCreatingConversation || isSending} className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 transition disabled:cursor-not-allowed disabled:opacity-50">
+          {isCreatingConversation ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquarePlus className="w-4 h-4" />} New conversation
         </button>
       </header>
-      {error && <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300" role="alert"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{error}</div>}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 items-start">
         <aside className="glass-card p-3 lg:sticky lg:top-24">
           <h2 className="px-2 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Conversations</h2>
           {isLoading && <Loader2 className="w-5 h-5 text-brand-400 animate-spin m-4" />}
           {!isLoading && conversations.length === 0 && <p className="px-2 py-4 text-sm text-slate-500">No conversations yet.</p>}
           <div className="space-y-1 max-h-64 lg:max-h-[60vh] overflow-y-auto">
-            {conversations.map((conversation) => <button key={conversation.id} type="button" onClick={() => setSelected(conversation)} className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition ${selected?.id === conversation.id ? 'bg-brand-500/15 text-brand-200 border border-brand-500/25' : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200 border border-transparent'}`}><span className="block truncate">{conversation.title}</span><span className="block text-[10px] text-slate-500 mt-1">{new Date(conversation.updatedAt).toLocaleDateString()}</span></button>)}
+            {conversations.map((conversation) => <button key={conversation.id} type="button" aria-current={selected?.id === conversation.id ? 'page' : undefined} onClick={() => setSelected(conversation)} disabled={isSending} className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition ${selected?.id === conversation.id ? 'bg-brand-500/15 text-brand-200 border border-brand-500/25' : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200 border border-transparent'} disabled:cursor-not-allowed disabled:opacity-50`}><span className="block truncate">{conversation.title}</span><span className="block text-[10px] text-slate-500 mt-1">{new Date(conversation.updatedAt).toLocaleDateString()}</span></button>)}
           </div>
         </aside>
-        <CareerChat conversation={selected} messages={messages} isLoading={isMessagesLoading} isSending={isSending} error={null} onSend={handleSend} />
+        <CareerChat conversation={selected} messages={messages} isLoading={isMessagesLoading} isSending={isSending} error={error} onSend={handleSend} />
       </div>
       <section className="glass-card p-5 sm:p-6" aria-labelledby="resume-improvement-heading">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">

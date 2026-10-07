@@ -11,6 +11,9 @@ const EMPTY_CONTEXT = {
   resumeProjects: [],
   resumeMissingSections: [],
   resumeSuggestions: [],
+  resumeTargetRole: null,
+  resumeJobFitScore: null,
+  resumeJobFitMissingSkills: [],
   latestJobTitle: null,
   latestJobCompany: null,
   latestJobOverallScore: null,
@@ -19,10 +22,22 @@ const EMPTY_CONTEXT = {
   latestJobMatchedSkills: [],
   latestJobMissingSkills: [],
   latestJobSkillGaps: [],
+  jobMarketStatus: 'unavailable',
+  jobMarketTotalMatches: null,
+  jobMarketSuitableRoles: [],
+  jobMarketCommonSkills: [],
+  jobMarketSkillGaps: [],
+  activeCareerPlanGoal: null,
+  activeCareerPlanItems: [],
 };
 
 function safeContext(context) {
-  return context ?? EMPTY_CONTEXT;
+  const source = context ?? {};
+  const merged = { ...EMPTY_CONTEXT, ...source };
+  for (const key of Object.keys(EMPTY_CONTEXT)) {
+    if (Array.isArray(EMPTY_CONTEXT[key]) && !Array.isArray(merged[key])) merged[key] = [];
+  }
+  return merged;
 }
 
 function normalize(value) {
@@ -81,8 +96,10 @@ function missingInformation(context) {
   if (context.careerGoal == null) missing.push('career goal');
   if (mergedSkills(context).length === 0) missing.push('skills');
   if (context.resumeDetectedSkills.length === 0 && context.resumeExperience.length === 0
-      && context.resumeProjects.length === 0) missing.push('resume analysis');
+      && context.resumeProjects.length === 0 && context.resumeMissingSections.length === 0
+      && context.resumeSuggestions.length === 0) missing.push('resume analysis');
   if (context.latestJobTitle == null) missing.push('job analysis');
+  if (context.jobMarketStatus !== 'available') missing.push('job-market snapshot');
   return missing.length === 0 ? '' : `Available context is missing: ${join(missing)}.`;
 }
 
@@ -119,18 +136,58 @@ export class DeterministicCareerAiProvider {
   answerCareerQuestion(contextInput, question) {
     const context = safeContext(contextInput);
     const value = normalize(question);
+    if (containsAny(value, ['job market', 'market trend', 'market demand', 'in demand', 'hiring trend'])) {
+      if (context.jobMarketStatus !== 'available') {
+        return withFollowUps(context, 'There is no saved job-market snapshot in your current resume analysis, so I cannot report market demand or statistics. Run or refresh Resume Analyzer to see the available dataset snapshot; it does not provide a historical trend by itself.', ['Which skills should I compare with a target role?']);
+      }
+      const roles = context.jobMarketSuitableRoles
+        .map((role) => `${role.title} (${role.jobCount})`).join(', ');
+      const skills = context.jobMarketCommonSkills
+        .map((skill) => `${skill.skill} (${skill.jobCount})`).join(', ');
+      const matches = context.jobMarketTotalMatches == null
+        ? 'The saved analysis does not include a total match count.'
+        : `The saved analysis matched ${context.jobMarketTotalMatches} postings.`;
+      const details = [
+        roles ? `Recommended roles in that snapshot: ${roles}.` : '',
+        skills ? `Skills appearing in the saved recommendations: ${skills}.` : '',
+      ].filter(Boolean).join(' ');
+      return withFollowUps(context, `${matches} ${details || 'No role or skill breakdown was saved.'} This is a snapshot from your analysis, not evidence of how demand has changed over time.`, ['Which market-listed skills are not in my profile?', 'What should I learn next?']);
+    }
+    if (containsAny(value, ['career plan', 'action plan', 'my plan'])) {
+      const openItems = context.activeCareerPlanItems.filter((item) => !item.completed);
+      if (context.activeCareerPlanItems.length === 0) {
+        return withFollowUps(context, 'No active career plan is saved yet. Generate one from the Career Plan page to create trackable next steps.', ['Create a learning roadmap', 'What should I do next?']);
+      }
+      const goal = context.activeCareerPlanGoal ?? context.careerGoal;
+      const nextSteps = openItems.slice(0, 4).map((item) => item.title);
+      const answer = `Your saved active career plan${goal ? ` for ${goal}` : ''} has ${openItems.length} incomplete item${openItems.length === 1 ? '' : 's'}.${nextSteps.length ? ` Next steps include: ${join(nextSteps)}.` : ' All listed items are marked complete.'}`;
+      return withFollowUps(context, answer, ['How do I prepare for an interview?', 'What should I learn next?']);
+    }
     if (containsAny(value, ['career goal', 'career path', 'target role', 'goal'])) {
       const answer = context.careerGoal == null
         ? 'No career goal is saved yet. Define a target role or direction so skills, projects, and resume choices can be prioritized.'
-        : `Your saved career goal is ${context.careerGoal}. Use it as the filter for choosing skills, projects, and job requirements.`;
+        : `Your saved career goal is ${context.careerGoal}. Use it as the filter for choosing skills, projects, and job requirements.${context.activeCareerPlanItems.length ? ` You also have ${context.activeCareerPlanItems.filter((item) => !item.completed).length} incomplete items in your active career plan.` : ''}`;
       return withFollowUps(context, answer, ['Which skills support this goal?', 'What should I do next?']);
     }
-    if (containsAny(value, ['skill gap', 'skill gaps', 'missing skill', 'should i learn'])) {
+    if ((/\b(missing|gap|gaps|lack|shortfall)\b/.test(value) && /\b(skill|skills|technology|technologies)\b/.test(value))
+        || containsAny(value, ['should i learn', 'what should i learn', 'learn next'])) {
       const gaps = filteredMissingSkills(context.latestJobMissingSkills, normalizedSkillSet(context));
-      if (gaps.length === 0) {
+      const resumeGaps = filteredMissingSkills(context.resumeJobFitMissingSkills, normalizedSkillSet(context));
+      const allGaps = mergeDistinct(gaps, resumeGaps);
+      if (allGaps.length > 0) {
+        const role = context.latestJobTitle ?? context.resumeTargetRole;
+        const roleContext = role ? ` for ${role}` : '';
+        return withFollowUps(context, `Your saved job-fit analysis${roleContext} identifies these skill gaps not listed in your profile or resume: ${join(allGaps)}. Start with required skills from the job analysis, then verify progress with a project or practice evidence.`, ['Which gap should I prioritize?', 'Recommend a project for my top gap.']);
+      }
+      if (context.latestJobTitle == null && context.resumeTargetRole == null) {
+        return withFollowUps(context, 'I cannot identify role-specific missing skills without a saved target-role or job-fit analysis. Your recorded skills are not enough to infer a role’s requirements.', ['Analyze a target job', 'What skills are in my profile?']);
+      }
+      if (context.jobMarketStatus === 'available' && context.jobMarketSkillGaps.length > 0) {
+        return withFollowUps(context, `Your saved market snapshot flags these skills as gaps in recommended postings: ${join(context.jobMarketSkillGaps.map((item) => item.skill))}. These are market signals from the snapshot, not confirmation of your proficiency; compare them with your experience before adding them to a learning plan.`, ['How can I improve my resume?', 'What should I learn next?']);
+      }
+      if (allGaps.length === 0) {
         return withFollowUps(context, 'No unaddressed job skill gaps are available in the current context. Add a job analysis to receive role-specific gap guidance.', ['How can I improve my resume?']);
       }
-      return withFollowUps(context, `The current unaddressed job skill gaps are: ${join(gaps)}. Start with required skills, then validate progress through a practical project.`, ['Which gap should I prioritize?']);
     }
     if (containsAny(value, ['skill', 'technology', 'technologies', 'stack'])) {
       const skills = mergedSkills(context);
@@ -141,7 +198,7 @@ export class DeterministicCareerAiProvider {
     }
     if (containsAny(value, ['resume', 'cv', 'curriculum'])) {
       const answer = context.resumeMissingSections.length === 0 && context.resumeSuggestions.length === 0
-        ? 'No specific resume gaps or suggestions are available in the current structured context. Keep claims truthful and connect each bullet to evidence.'
+        ? 'No saved resume-analysis findings are available to reference, so I cannot identify specific weaknesses yet. Run Resume Analyzer first; until then, keep claims truthful and connect each bullet to evidence.'
         : `Resume focus areas: missing sections ${joinOrNone(context.resumeMissingSections)}; existing suggestions ${joinOrNone(context.resumeSuggestions)}.`;
       return withFollowUps(context, answer, ['Suggest stronger wording', 'What content is missing?']);
     }
@@ -161,15 +218,17 @@ export class DeterministicCareerAiProvider {
     }
     if (containsAny(value, ['job match', 'job matching', 'match', 'job requirement', 'position'])) {
       if (context.latestJobTitle == null) {
-        return withFollowUps(context, 'No job analysis is available yet. Analyze a target job to compare its requirements with your structured skills.', ['Which skills should I improve?']);
+        const role = context.resumeTargetRole;
+        const roleScore = context.resumeJobFitScore;
+        if (role && roleScore != null) {
+          return withFollowUps(context, `Your latest resume analysis recorded a ${roleScore} match score for ${role}.${context.resumeJobFitMissingSkills.length ? ` It lists these missing skills: ${join(context.resumeJobFitMissingSkills)}.` : ''}`, ['Which skills should I improve?', 'How can I improve my resume?']);
+        }
+        return withFollowUps(context, 'No saved job-fit analysis is available yet. Analyze a target job to compare its requirements with your structured skills.', ['Which skills should I improve?']);
       }
       const score = context.latestJobOverallScore == null ? 'an unrecorded' : String(context.latestJobOverallScore);
       return withFollowUps(context, `The latest analyzed role is ${context.latestJobTitle} with a recorded match score of ${score}. Review matched skills and close the unaddressed requirements before presenting yourself for the role.`, ['What are my remaining skill gaps?']);
     }
-    return {
-      answer: `Focus on your stated career goal, strengthen the most relevant skill gaps, and support your profile with truthful resume evidence and practical projects. ${missingInformation(context)}`,
-      followUpSuggestions: ['What is my career goal?', 'Which skills should I improve next?', 'How can I improve my resume?'],
-    };
+    return withFollowUps(context, 'I can help with your resume, job fit, skills, career direction, interview preparation, projects, learning roadmap, and saved job-market insights. Ask about one of these areas and I will use the information available in your JOBFIT AI account.', ['What skills am I missing for my target role?', 'How can I improve my resume?', 'What should I learn next?']);
   }
 
   generateActionPlan(contextInput) {

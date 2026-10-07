@@ -250,6 +250,7 @@ export interface CareerAssistantMessage {
   role: CareerAssistantMessageRole;
   content: string;
   provider: string | null;
+  followUpSuggestions: string[];
   createdAt: string;
 }
 

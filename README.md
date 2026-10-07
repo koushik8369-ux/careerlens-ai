@@ -20,7 +20,7 @@ The active API is in `server/`. The original Spring Boot/MySQL implementation in
 - User profile and dashboard
 - Resume Analyzer: PDF, DOCX, DOC, and TXT uploads; evidence-based scoring, extracted profile and resume sections, ATS-style checks, job-market insights, recommendations, and history
 - Job Intelligence: deterministic job description analysis, skill matching, recommendations, and history
-- Career Assistant conversations and deterministic responses
+- Career Assistant conversations grounded in owner-scoped profile, resume, job-fit, market snapshot, and active-plan context; deterministic by default with suggested follow-ups and bounded conversation history in LLM mode
 - Resume improvement, skill roadmap, project recommendations, interview preparation, and action plan
 - Career plan generation, retrieval, ordered task completion, and archival of the previous active plan
 - Optional OpenAI-compatible career AI provider; deterministic behavior is the default
