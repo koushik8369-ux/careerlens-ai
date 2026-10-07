@@ -5,7 +5,10 @@ import { createAuthMiddleware } from '../middleware/authMiddleware.js';
 import { createCareerPlanService } from '../services/careerPlanService.js';
 
 const validatePlanItemUpdate = [
-  body('completed').isBoolean().withMessage('completed must be a boolean'),
+  body().custom((value) => (
+    (typeof value?.completed === 'boolean')
+    || ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'].includes(value?.status)
+  )).withMessage('Provide a valid completed flag or item status'),
   (request, _response, next) => {
     const result = validationResult(request);
     if (result.isEmpty()) return next();

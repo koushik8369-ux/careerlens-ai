@@ -29,7 +29,7 @@ export function createCareerPlanController({ service = createCareerPlanService()
           request.user,
           request.params.id,
           request.params.itemId,
-          request.body?.completed,
+          request.body,
         ));
       } catch (error) {
         return next(error);

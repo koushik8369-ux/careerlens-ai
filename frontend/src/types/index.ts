@@ -280,18 +280,140 @@ export interface CareerRoadmapResult {
 export interface ProjectRecommendation {
   title: string;
   description: string;
+  category: ProjectRecommendationCategory;
+  targetRole: string | null;
+  roleRelevance: string;
+  difficulty: ProjectRecommendationDifficulty;
+  technologyStack: string[];
+  expectedOutcome: string;
+  resumeValue: string[];
+  skillsToDevelop: string[];
+  skillsToDemonstrate: string[];
+  addressesSkillGaps: string[];
   skills: string[];
   rationale: string;
+  whyRecommended: string;
+  marketEvidence: Array<{
+    skill: string;
+    jobCount: number;
+    source: string;
+  }>;
+  extendsProjects: string[];
+  careerPlanAlignment: Array<{
+    title: string;
+    itemType: string | null;
+    completed: boolean;
+  }>;
+  phases: Array<{
+    name: string;
+    tasks: string[];
+  }>;
 }
 
 export interface ProjectRecommendationResult {
   recommendations: ProjectRecommendation[];
+  targetRole: string | null;
+  availableFocusSkills: string[];
+  contextAvailability: {
+    targetRole: boolean;
+    profileSkills: boolean;
+    resumeSkills: boolean;
+    resumeProjects: boolean;
+    resumeJobFit: boolean;
+    jobIntelligence: boolean;
+    jobMarketSnapshot: boolean;
+    careerPlan: boolean;
+  };
+  contextNotice: string | null;
+  preferences: ProjectRecommendationPreferences;
+}
+
+export type ProjectRecommendationCategory =
+  | 'BACKEND'
+  | 'FRONTEND'
+  | 'FULL_STACK'
+  | 'AI_ML'
+  | 'DATA'
+  | 'CLOUD_DEVOPS'
+  | 'GENERAL';
+
+export type ProjectRecommendationDifficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+
+export interface ProjectRecommendationPreferences {
+  category?: ProjectRecommendationCategory;
+  difficulty?: ProjectRecommendationDifficulty;
+  focusSkill?: string;
 }
 
 export interface InterviewPreparationResult {
+  targetRole: string | null;
   technicalTopics: string[];
   behavioralQuestions: string[];
   projectTalkingPoints: string[];
+  questions: InterviewPreparationQuestion[];
+  contextAvailability: {
+    targetRole: boolean;
+    resumeAnalysis: boolean;
+    projects: boolean;
+    experience: boolean;
+    jobFit: boolean;
+    jobDescription: boolean;
+    careerPlan: boolean;
+  };
+  contextNotice: string | null;
+  readiness: {
+    status: InterviewReadinessStatus;
+    dimensions: Array<{
+      name: string;
+      status: InterviewReadinessStatus;
+      evidence: string;
+    }>;
+  };
+  recommendedPracticeAreas: string[];
+}
+
+export type InterviewPreparationCategory =
+  | 'TECHNICAL'
+  | 'BEHAVIORAL'
+  | 'RESUME_BASED'
+  | 'PROJECT_BASED'
+  | 'ROLE_SPECIFIC'
+  | 'SITUATIONAL'
+  | 'HR';
+
+export type InterviewReadinessStatus = 'STRONG' | 'NEEDS_PRACTICE' | 'NOT_ENOUGH_DATA';
+
+export interface InterviewPreparationQuestion {
+  id: string;
+  category: InterviewPreparationCategory;
+  question: string;
+  rationale: string;
+}
+
+export interface InterviewAnswerFeedbackRequest {
+  question: string;
+  category: InterviewPreparationCategory;
+  answer: string;
+}
+
+export interface InterviewAnswerFeedback {
+  topicCoverage: {
+    status: 'SOME_TERMS_PRESENT' | 'NO_SHARED_TERMS_DETECTED';
+    note: string;
+    matchedTerms: string[];
+  };
+  clarity: {
+    status: 'DETAILED' | 'BRIEF';
+    wordCount: number;
+    sentenceCount: number;
+  };
+  structure: {
+    suggestedFormat: 'STAR' | 'POINT_EXAMPLE_OUTCOME';
+    detectedStarElements: string[];
+  };
+  strengths: string[];
+  improvements: string[];
+  technicalValidation: string;
 }
 
 export interface CareerActionPlanResult {
@@ -301,6 +423,7 @@ export interface CareerActionPlanResult {
 export type CareerPlanStatus = 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
 export type CareerPlanCategory = 'SHORT_TERM' | 'MEDIUM_TERM' | 'LONG_TERM';
 export type CareerPlanItemType = 'LEARNING' | 'PROJECT' | 'INTERVIEW' | 'RESUME';
+export type CareerPlanItemStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
 
 export interface CareerPlanItem {
   id: string;
@@ -311,7 +434,17 @@ export interface CareerPlanItem {
   skills: string[];
   priority: string;
   completed: boolean;
+  status: CareerPlanItemStatus;
   sortOrder: number;
+}
+
+export interface CareerPlanProgress {
+  totalItems: number;
+  completedItems: number;
+  inProgressItems: number;
+  remainingItems: number;
+  completionPercent: number;
+  currentStage: CareerPlanCategory | null;
 }
 
 export interface CareerPlan {
@@ -320,11 +453,13 @@ export interface CareerPlan {
   sourceJobAnalysisId: string | null;
   careerGoal: string | null;
   status: CareerPlanStatus;
+  progress: CareerPlanProgress;
   createdAt: string;
   updatedAt: string;
   items: CareerPlanItem[];
 }
 
 export interface CareerPlanItemUpdateRequest {
-  completed: boolean;
+  completed?: boolean;
+  status?: CareerPlanItemStatus;
 }

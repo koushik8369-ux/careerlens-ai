@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Bot, BriefcaseBusiness, FileText, GraduationCap, Loader2, MessageSquarePlus, Route, Sparkles, Target } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertCircle, ArrowRight, Bot, BriefcaseBusiness, FileText, GraduationCap, Loader2, MessageSquarePlus, Route, Sparkles, Target } from 'lucide-react';
 import axios from 'axios';
 import { CareerChat } from '../components/career/CareerChat';
 import { CareerAiToolSection } from '../components/career/CareerAiToolSection';
+import { ProjectRecommendationCards } from '../components/career/ProjectRecommendationCards';
 import {
   createCareerAssistantConversation,
   generateCareerActionPlan,
@@ -284,17 +286,13 @@ export const CareerAssistantPage: React.FC = () => {
           isLoading={isProjectsLoading}
           error={projectsError}
           hasResult={Boolean(projects && projects.recommendations.length > 0)}
-          emptyMessage="No project recommendations generated yet."
+          emptyMessage={projects?.contextNotice ?? 'No project recommendations generated yet.'}
           onGenerate={() => void handleProjects()}
         >
-          <div className="grid gap-4">
-            {projects?.recommendations.map((project) => <article key={project.title} className="rounded-xl border border-slate-800/80 bg-slate-950/30 p-4">
-              <h3 className="text-sm font-semibold text-white">{project.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-400">{project.description}</p>
-              {project.skills.length > 0 && <TagList items={project.skills} />}
-              <p className="mt-3 border-t border-slate-800/70 pt-3 text-xs leading-5 text-slate-500"><span className="font-semibold text-slate-400">Why this helps: </span>{project.rationale}</p>
-            </article>)}
-          </div>
+          {projects?.targetRole && <p className="mb-4 text-sm text-slate-400">Target role: <span className="font-medium text-slate-200">{projects.targetRole}</span></p>}
+          {projects?.contextNotice && <p className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100">{projects.contextNotice}</p>}
+          <ProjectRecommendationCards recommendations={projects?.recommendations ?? []} />
+          {projects && <Link to="/project-recommendations" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-brand-500/25 bg-brand-500/5 px-4 py-2.5 text-sm font-semibold text-brand-200 transition hover:bg-brand-500/10">Explore and refine projects <ArrowRight className="h-4 w-4" /></Link>}
         </CareerAiToolSection>
 
         <CareerAiToolSection
@@ -309,11 +307,14 @@ export const CareerAssistantPage: React.FC = () => {
           emptyMessage="No interview preparation generated yet."
           onGenerate={() => void handleInterviewPreparation()}
         >
+          {interviewPreparation?.targetRole && <p className="mb-4 text-sm text-slate-400">Target role: <span className="font-medium text-slate-200">{interviewPreparation.targetRole}</span></p>}
+          {interviewPreparation?.contextNotice && <p className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-100">{interviewPreparation.contextNotice}</p>}
           <div className="grid gap-4 md:grid-cols-3">
             <InterviewGroup title="Technical topics" items={interviewPreparation?.technicalTopics ?? []} />
             <InterviewGroup title="Behavioral questions" items={interviewPreparation?.behavioralQuestions ?? []} />
             <InterviewGroup title="Project talking points" items={interviewPreparation?.projectTalkingPoints ?? []} />
           </div>
+          {interviewPreparation && <Link to="/interview-preparation" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-brand-500/25 bg-brand-500/5 px-4 py-2.5 text-sm font-semibold text-brand-200 transition hover:bg-brand-500/10">Open answer practice <ArrowRight className="h-4 w-4" /></Link>}
         </CareerAiToolSection>
 
         <CareerAiToolSection

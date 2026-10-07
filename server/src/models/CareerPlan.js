@@ -8,6 +8,7 @@ const careerPlanItemSchema = new mongoose.Schema({
   skills: { type: [String], default: [] },
   priority: { type: String, required: true, maxlength: 20 },
   completed: { type: Boolean, required: true, default: false },
+  status: { type: String, enum: ['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'], default: 'NOT_STARTED' },
   sortOrder: { type: Number, required: true },
 }, { versionKey: false });
 

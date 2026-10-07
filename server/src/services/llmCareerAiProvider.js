@@ -44,9 +44,12 @@ function contextPrompt(context) {
     resumeSuggestions: context.resumeSuggestions,
     resumeTargetRole: context.resumeTargetRole,
     resumeJobFitScore: context.resumeJobFitScore,
+    resumeJobFitRequiredSkills: context.resumeJobFitRequiredSkills,
+    resumeJobFitMatchedSkills: context.resumeJobFitMatchedSkills,
     resumeJobFitMissingSkills: context.resumeJobFitMissingSkills,
     latestJobTitle: context.latestJobTitle,
     latestJobCompany: context.latestJobCompany,
+    latestJobDescription: context.latestJobDescription,
     latestJobOverallScore: context.latestJobOverallScore,
     latestJobRequiredSkills: context.latestJobRequiredSkills,
     latestJobPreferredSkills: context.latestJobPreferredSkills,
@@ -110,25 +113,58 @@ export class LlmCareerAiProvider {
     };
   }
 
-  async recommendProjects(context) {
-    const result = await this.contextTask(context, 'Recommend practical, truthful portfolio projects.', '{"recommendations":[{"title":"string","description":"string","skills":["string"],"rationale":"string"}]}');
+  async recommendProjects(context, preferences = {}) {
+    const result = await this.contextTask(
+      context,
+      `Recommend up to three concrete portfolio projects from the supplied saved profile, resume, Job Intelligence, market snapshot and Career Plan context. Return the user's recorded skills separately from skills to develop; only use explicit saved gaps in skillsToDevelop. Treat technologyStack as suggested project choices, not current user qualifications. Do not invent market counts or claim an existing project unless it appears in resumeProjects. Prefer a distinct extension to a relevant existing resume project instead of duplicating it. Include actionable phases. Apply these preferences where supported: ${JSON.stringify(preferences)}.`,
+      '{"recommendations":[{"title":"string","description":"string","category":"BACKEND|FRONTEND|FULL_STACK|AI_ML|DATA|CLOUD_DEVOPS|GENERAL","difficulty":"BEGINNER|INTERMEDIATE|ADVANCED","skills":["string"],"skillsToDevelop":["string"],"skillsToDemonstrate":["string"],"technologyStack":["string"],"expectedOutcome":"string","resumeValue":["string"],"phases":[{"name":"string","tasks":["string"]}],"extendsProjects":["exact saved resume project title"],"rationale":"string"}]}',
+    );
     if (!Array.isArray(result.recommendations) || result.recommendations.length === 0) throw this.invalidResponse();
     return {
       recommendations: result.recommendations.map((recommendation) => ({
         title: this.requiredText(recommendation, 'title'),
         description: this.requiredText(recommendation, 'description'),
         skills: this.requiredStringList(recommendation, 'skills'),
+        skillsToDevelop: this.requiredStringList(recommendation, 'skillsToDevelop'),
+        skillsToDemonstrate: this.requiredStringList(recommendation, 'skillsToDemonstrate'),
+        technologyStack: this.requiredStringList(recommendation, 'technologyStack'),
+        expectedOutcome: this.requiredText(recommendation, 'expectedOutcome'),
+        resumeValue: this.requiredStringList(recommendation, 'resumeValue'),
+        phases: Array.isArray(recommendation.phases) ? recommendation.phases.map((phase) => ({
+          name: this.requiredText(phase, 'name'),
+          tasks: this.requiredStringList(phase, 'tasks'),
+        })) : [],
+        extendsProjects: this.requiredStringList(recommendation, 'extendsProjects'),
+        category: this.requiredText(recommendation, 'category'),
+        difficulty: this.requiredText(recommendation, 'difficulty'),
         rationale: this.requiredText(recommendation, 'rationale'),
       })),
     };
   }
 
   async prepareForInterview(context) {
-    const result = await this.contextTask(context, 'Prepare technical topics, behavioral questions, and project talking points.', '{"technicalTopics":["string"],"behavioralQuestions":["string"],"projectTalkingPoints":["string"]}');
+    const result = await this.contextTask(
+      context,
+      'Create role-adaptive interview questions using only the supplied saved profile, resume analysis, job analysis and career plan. Never claim the candidate has a project or experience unless it is explicitly listed. For PROJECT_BASED and RESUME_BASED questions, include the exact project or resume evidence in the question. If context is missing, provide generic behavioral, situational or HR questions only. Include technicalTopics only from recorded skills or job requirements. Include projectTalkingPoints only for projects listed in resumeProjects.',
+      '{"technicalTopics":["string"],"behavioralQuestions":["string"],"projectTalkingPoints":["string"],"questions":[{"category":"TECHNICAL|BEHAVIORAL|RESUME_BASED|PROJECT_BASED|ROLE_SPECIFIC|SITUATIONAL|HR","question":"string","rationale":"string"}]}',
+    );
+    if (!Array.isArray(result.questions)
+        || result.questions.some((item) => (
+          typeof item?.question !== 'string'
+          || typeof item?.rationale !== 'string'
+          || !['TECHNICAL', 'BEHAVIORAL', 'RESUME_BASED', 'PROJECT_BASED', 'ROLE_SPECIFIC', 'SITUATIONAL', 'HR'].includes(item.category)
+        ))) {
+      throw this.invalidResponse();
+    }
     return {
       technicalTopics: this.requiredStringList(result, 'technicalTopics'),
       behavioralQuestions: this.requiredStringList(result, 'behavioralQuestions'),
       projectTalkingPoints: this.requiredStringList(result, 'projectTalkingPoints'),
+      questions: result.questions.map((item) => ({
+        category: item.category,
+        question: item.question.trim(),
+        rationale: item.rationale.trim(),
+      })),
     };
   }
 

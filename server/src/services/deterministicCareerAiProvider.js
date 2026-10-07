@@ -13,9 +13,12 @@ const EMPTY_CONTEXT = {
   resumeSuggestions: [],
   resumeTargetRole: null,
   resumeJobFitScore: null,
+  resumeJobFitRequiredSkills: [],
+  resumeJobFitMatchedSkills: [],
   resumeJobFitMissingSkills: [],
   latestJobTitle: null,
   latestJobCompany: null,
+  latestJobDescription: null,
   latestJobOverallScore: null,
   latestJobRequiredSkills: [],
   latestJobPreferredSkills: [],
@@ -126,6 +129,54 @@ function projectFor(skill) {
     return `Build a Docker and CI/CD project that demonstrates ${skill}.`;
   }
   return `Build a focused portfolio project that demonstrates ${skill} in a truthful, measurable way.`;
+}
+
+function projectCategory(skills, projectText = '') {
+  const value = normalize([...skills, projectText].join(' '));
+  if (containsAny(value, ['machine learning', 'artificial intelligence', ' ai ', ' ml ', 'llm', 'nlp'])) return 'AI_ML';
+  if (containsAny(value, ['data', 'analytics', 'power bi', 'tableau', 'warehouse', 'etl'])) return 'DATA';
+  if (containsAny(value, ['docker', 'kubernetes', 'devops', 'ci/cd', 'cloud', 'azure', 'aws'])) return 'CLOUD_DEVOPS';
+  const backend = containsAny(value, ['backend', 'api', 'java', 'spring', 'node', 'express', 'python', 'django', 'sql', 'database', 'postgres', 'mysql']);
+  const frontend = containsAny(value, ['frontend', 'front-end', 'react', 'angular', 'vue', 'javascript', 'typescript', 'html', 'css']);
+  if (backend && frontend) return 'FULL_STACK';
+  if (backend) return 'BACKEND';
+  if (frontend) return 'FRONTEND';
+  return 'GENERAL';
+}
+
+function projectTitle(category, role, gap, existingProject) {
+  if (existingProject) return `Production-ready extension for ${existingProject}`;
+  const roleName = role ?? ({
+    BACKEND: 'backend development',
+    FRONTEND: 'frontend development',
+    FULL_STACK: 'full-stack development',
+    AI_ML: 'AI and machine learning',
+    DATA: 'data development',
+    CLOUD_DEVOPS: 'cloud delivery',
+    GENERAL: 'your career direction',
+  })[category];
+  return gap
+    ? `Portfolio project applying ${gap} for ${roleName}`
+    : `Portfolio project demonstrating ${roleName}`;
+}
+
+function projectPhases(category, skills, difficulty) {
+  const phases = [
+    { name: 'Define the scope', tasks: ['Choose a specific user problem.', 'Write a small set of testable acceptance criteria.'] },
+    { name: 'Design the solution', tasks: ['Document the main components and data flow.', 'Record key decisions and assumptions.'] },
+    { name: 'Build the core project', tasks: ['Implement a working end-to-end path.', 'Keep the scope aligned with the target role and selected skills.'] },
+  ];
+  if (['BACKEND', 'FULL_STACK', 'DATA'].includes(category)) {
+    phases.push({ name: 'Complete the data and API layer', tasks: ['Define clear request and response contracts.', 'Validate input and handle expected failures.'] });
+  }
+  phases.push({ name: 'Test and document', tasks: ['Add automated tests for core behavior.', 'Document setup, decisions, limitations, and verifiable results.'] });
+  if (skills.some((skill) => containsAny(normalize(skill), ['docker', 'kubernetes', 'cloud', 'azure', 'aws', 'ci/cd']))) {
+    phases.push({ name: 'Prepare a deployment', tasks: ['Create a repeatable deployment configuration.', 'Document how to run and verify the deployed project.'] });
+  }
+  if (difficulty === 'ADVANCED') {
+    phases.splice(2, 0, { name: 'Plan reliability', tasks: ['Identify failure cases and operational risks.', 'Define monitoring and recovery expectations.'] });
+  }
+  return phases;
 }
 
 export class DeterministicCareerAiProvider {
@@ -326,25 +377,112 @@ export class DeterministicCareerAiProvider {
     ] };
   }
 
-  recommendProjects(contextInput) {
+  recommendProjects(contextInput, preferences = {}) {
     const context = safeContext(contextInput);
-    const existing = normalizedSkillSet(context);
-    let gaps = filteredMissingSkills(context.latestJobRequiredSkills, existing);
-    gaps = mergeDistinct(gaps, filteredMissingSkills(context.latestJobPreferredSkills, existing));
-    if (gaps.length === 0) gaps = filteredMissingSkills(context.latestJobMissingSkills, existing);
-    const recommendations = gaps.slice(0, 3).map((skill) => ({
-      title: projectFor(skill),
-      description: 'Create a focused, truthful project with documented decisions, implementation details, and measurable outcomes.',
-      skills: [skill],
-      rationale: 'This project addresses an unaddressed skill in the available job context.',
-    }));
-    if (recommendations.length === 0) {
-      const goal = context.careerGoal ?? 'your target career direction';
+    const role = context.careerGoal ?? context.resumeTargetRole ?? context.latestJobTitle ?? null;
+    const knownSkills = mergedSkills(context);
+    const normalizedKnownSkills = new Set(knownSkills.map(normalize));
+    const gapSources = [
+      [context.latestJobMissingSkills, 'Job Intelligence'],
+      [context.resumeJobFitMissingSkills, 'Resume Analyzer job fit'],
+      [context.latestJobSkillGaps.map((item) => item.skill), 'Job Intelligence'],
+      [context.jobMarketSkillGaps.map((item) => item.skill), 'saved job-market snapshot'],
+    ];
+    const gapsByValue = new Map();
+    for (const [values, source] of gapSources) {
+      for (const skill of distinct(values)) {
+        const key = normalize(skill);
+        if (!key) continue;
+        const entry = gapsByValue.get(key) ?? { skill, sources: [] };
+        if (!entry.sources.includes(source)) entry.sources.push(source);
+        gapsByValue.set(key, entry);
+      }
+    }
+    let gaps = [...gapsByValue.values()];
+    const marketSkills = new Map(context.jobMarketSkillGaps.map(({ skill, jobCount }) => [normalize(skill), { skill, jobCount }]));
+    const requiredSkills = distinct([
+      ...context.latestJobRequiredSkills,
+      ...context.latestJobPreferredSkills,
+      ...context.resumeJobFitRequiredSkills,
+    ]);
+    const priority = (entry) => {
+      const key = normalize(entry.skill);
+      if (requiredSkills.some((skill) => normalize(skill) === key)) return 0;
+      if (entry.sources.includes('Resume Analyzer job fit')) return 1;
+      if (entry.sources.includes('Job Intelligence')) return 2;
+      return 3;
+    };
+    gaps.sort((left, right) => priority(left) - priority(right));
+    if (preferences.focusSkill) {
+      const focus = normalize(preferences.focusSkill);
+      gaps = gaps.filter(({ skill }) => normalize(skill) === focus);
+    }
+
+    const groups = new Map();
+    for (const gap of gaps) {
+      const category = projectCategory([gap.skill]);
+      if (!groups.has(category)) groups.set(category, []);
+      groups.get(category).push(gap);
+    }
+    if (groups.size === 0) {
+      for (const skill of knownSkills) {
+        const category = projectCategory([skill]);
+        if (!groups.has(category)) groups.set(category, []);
+      }
+    }
+    if (groups.size === 0 && context.resumeProjects.length > 0) {
+      const project = context.resumeProjects[0];
+      groups.set(projectCategory([], project), []);
+    }
+    if (groups.size === 0 && role) groups.set(projectCategory([], role), []);
+    if (preferences.category) {
+      for (const category of [...groups.keys()]) {
+        if (category !== preferences.category) groups.delete(category);
+      }
+    }
+
+    const recommendations = [];
+    for (const [category, categoryGaps] of [...groups.entries()].slice(0, 3)) {
+      const focusedGaps = categoryGaps.slice(0, 3).map(({ skill }) => skill);
+      const selectedSkills = focusedGaps.length
+        ? focusedGaps
+        : knownSkills.filter((skill) => projectCategory([skill]) === category).slice(0, 3);
+      const existingProject = context.resumeProjects.find((project) => projectCategory([], project) === category)
+        ?? (category === 'CLOUD_DEVOPS'
+          ? context.resumeProjects.find((project) => /\b(api|service|application)\b/i.test(project)) ?? null
+          : null);
+      const difficulty = preferences.difficulty
+        ?? (context.resumeExperience.length > 0 || context.resumeProjects.length > 0 ? 'INTERMEDIATE' : 'BEGINNER');
+      const technologyStack = distinct([
+        ...knownSkills.filter((skill) => projectCategory([skill]) === category
+          || (existingProject && projectCategory([skill]) !== 'GENERAL')).slice(0, 2),
+        ...focusedGaps,
+      ]).slice(0, 4);
+      const demonstrationSkills = knownSkills
+        .filter((skill) => projectCategory([skill]) === category
+          || (existingProject && projectCategory([skill]) !== 'GENERAL'))
+        .slice(0, 4);
+      const title = projectTitle(category, role, focusedGaps[0], existingProject);
+      const description = existingProject
+        ? `Extend the saved resume project “${existingProject}” with a distinct production-readiness milestone; do not recreate the same project. Focus the extension on ${focusedGaps.length ? join(focusedGaps) : 'testing, reliability, and clear documentation'}.`
+        : `Build a scoped, end-to-end project for ${role ?? 'your career direction'}${focusedGaps.length ? ` that applies ${join(focusedGaps)}` : ''}. Document the actual implementation, decisions, tests, and verifiable results.`;
+      const outcome = `A working ${difficulty.toLowerCase()}-scope portfolio deliverable with documented implementation, automated tests, and results you can verify.`;
       recommendations.push({
-        title: `Build a portfolio project aligned with ${goal}.`,
-        description: 'Choose a small problem, implement it end to end, and document the problem, your contribution, technologies, and truthful outcome.',
-        skills: mergedSkills(context),
-        rationale: 'No unaddressed job skills are available, so the recommendation establishes evidence for your career direction.',
+        title,
+        description,
+        category,
+        difficulty,
+        skills: distinct([...focusedGaps, ...demonstrationSkills]),
+        skillsToDevelop: focusedGaps,
+        skillsToDemonstrate: demonstrationSkills,
+        technologyStack,
+        expectedOutcome: outcome,
+        resumeValue: ['Demonstrates implementation through a completed project.', 'Provides a truthful project entry with documented scope and verifiable results.'],
+        phases: projectPhases(category, technologyStack, difficulty),
+        extendsProjects: existingProject ? [existingProject] : [],
+        rationale: focusedGaps.length
+          ? `Addresses saved skill gaps: ${join(focusedGaps)}.`
+          : 'Builds evidence from skills or projects already present in your saved context.',
       });
     }
     return { recommendations };
@@ -352,22 +490,80 @@ export class DeterministicCareerAiProvider {
 
   prepareForInterview(contextInput) {
     const context = safeContext(contextInput);
-    const role = context.latestJobTitle ?? context.careerGoal ?? 'your target role';
-    let technicalTopics = context.latestJobRequiredSkills.length
-      ? distinct(context.latestJobRequiredSkills)
-      : mergedSkills(context);
-    if (technicalTopics.length === 0) technicalTopics = [`Review the fundamentals most relevant to ${role}.`];
-    const behavioralQuestions = [
-      'Describe a challenging problem you solved and how you approached it.',
-      'Tell me about a time you received difficult feedback and what you changed.',
-      `Why are you interested in ${role}?`,
-    ];
-    let projectTalkingPoints = context.resumeProjects
-      .filter((project) => typeof project === 'string' && project.trim())
-      .map((project) => `Explain the problem, your contribution, technical decisions, and truthful outcome for: ${project}.`);
-    if (projectTalkingPoints.length === 0) {
-      projectTalkingPoints = ['Prepare one concise project walkthrough covering the problem, your contribution, technical decisions, and outcome.'];
+    const role = context.latestJobTitle ?? context.careerGoal ?? context.resumeTargetRole;
+    const skills = distinct([...context.latestJobRequiredSkills, ...mergedSkills(context)]);
+    const questions = [];
+    const addQuestion = (category, question, rationale) => questions.push({ category, question, rationale });
+
+    for (const skill of skills.slice(0, 5)) {
+      const source = context.latestJobRequiredSkills.some((item) => normalize(item) === normalize(skill))
+        ? 'latest Job Intelligence requirements'
+        : 'skills recorded in your profile or resume analysis';
+      addQuestion(
+        'TECHNICAL',
+        `Explain the core concepts of ${skill} and how you would apply them${role ? ` in a ${role} role` : ''}.`,
+        `Based on ${skill} listed in your ${source}.`,
+      );
     }
-    return { technicalTopics, behavioralQuestions, projectTalkingPoints };
+
+    if (role && context.latestJobRequiredSkills.length > 0) {
+      addQuestion(
+        'ROLE_SPECIFIC',
+        `How would you prioritize the required skills for the ${role} role, and what would you clarify before starting the work?`,
+        `Based on the target role and requirements saved in your latest Job Intelligence analysis.`,
+      );
+    }
+
+    for (const experience of context.resumeExperience.slice(0, 2)) {
+      addQuestion(
+        'RESUME_BASED',
+        `Your resume analysis lists “${experience}”. What was your specific contribution, and what did you learn?`,
+        'References an experience entry detected in your saved resume analysis.',
+      );
+    }
+    for (const education of context.resumeEducation.slice(0, 2)) {
+      addQuestion(
+        'RESUME_BASED',
+        `Your resume analysis lists “${education}”. How has this education prepared you for the work you want to do?`,
+        'References an education entry detected in your saved resume analysis.',
+      );
+    }
+
+    for (const project of context.resumeProjects.slice(0, 3)) {
+      addQuestion(
+        'PROJECT_BASED',
+        `Your resume analysis lists “${project}”. Explain the problem, your contribution, a technical decision, and the outcome you can verify.`,
+        'References a project detected in your saved resume analysis.',
+      );
+    }
+
+    addQuestion(
+      'BEHAVIORAL',
+      'Describe a real challenge you faced, the steps you took, and what you learned. Use an example that reflects your actual experience.',
+      'General practice prompt; choose an example that is true for you.',
+    );
+    addQuestion(
+      'SITUATIONAL',
+      `How would you approach an unfamiliar task${role ? ` in a ${role} role` : ''} when the requirements are unclear?`,
+      'General situational practice prompt; no personal experience is assumed.',
+    );
+    addQuestion(
+      'HR',
+      role
+        ? `What interests you about pursuing a ${role} role?`
+        : 'What kind of role and working environment are you looking for?',
+      role
+        ? 'Uses your saved target role.'
+        : 'General HR practice prompt; no target role is saved yet.',
+    );
+
+    return {
+      technicalTopics: skills.slice(0, 8),
+      behavioralQuestions: questions.filter((item) => item.category === 'BEHAVIORAL').map((item) => item.question),
+      projectTalkingPoints: context.resumeProjects.slice(0, 3).map((project) => (
+        `Prepare to explain your contribution and verifiable outcome for: ${project}.`
+      )),
+      questions,
+    };
   }
 }
