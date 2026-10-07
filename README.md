@@ -21,7 +21,8 @@ The active API is in `server/`. The original Spring Boot/MySQL implementation in
 - Resume Analyzer: PDF, DOCX, DOC, and TXT uploads; evidence-based scoring, extracted profile and resume sections, ATS-style checks, job-market insights, recommendations, and history
 - Job Intelligence: deterministic job description analysis, skill matching, recommendations, and history
 - Career Assistant conversations grounded in owner-scoped profile, resume, job-fit, market snapshot, and active-plan context; deterministic by default with suggested follow-ups and bounded conversation history in LLM mode
-- Resume improvement, skill roadmap, project recommendations, interview preparation, and action plan
+- Resume improvement, skill roadmap, project recommendations, and career action plan
+- Interview Preparation uses saved role, resume, job-fit, and Career Plan context for categorized questions, text-based answer-structure feedback, and a mock-interview flow; it does not score technical correctness
 - Career plan generation grounded in saved profile, resume, job-fit, and available market-gap evidence, with stage-based tasks, tracked progress, and archival of the previous active plan
 - Optional OpenAI-compatible career AI provider; deterministic behavior is the default
 
@@ -53,6 +54,7 @@ All endpoints use the `/api` prefix. Health, registration, and login are public;
 | POST | `/api/career-assistant/roadmap` |
 | POST | `/api/career-assistant/projects` |
 | POST | `/api/career-assistant/interview-preparation` |
+| POST | `/api/career-assistant/interview-preparation/feedback` |
 | POST | `/api/career-plans` |
 | GET | `/api/career-plans/current` |
 | GET | `/api/career-plans/:id` |

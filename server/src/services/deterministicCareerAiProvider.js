@@ -16,6 +16,7 @@ const EMPTY_CONTEXT = {
   resumeJobFitMissingSkills: [],
   latestJobTitle: null,
   latestJobCompany: null,
+  latestJobDescription: null,
   latestJobOverallScore: null,
   latestJobRequiredSkills: [],
   latestJobPreferredSkills: [],
@@ -352,22 +353,80 @@ export class DeterministicCareerAiProvider {
 
   prepareForInterview(contextInput) {
     const context = safeContext(contextInput);
-    const role = context.latestJobTitle ?? context.careerGoal ?? 'your target role';
-    let technicalTopics = context.latestJobRequiredSkills.length
-      ? distinct(context.latestJobRequiredSkills)
-      : mergedSkills(context);
-    if (technicalTopics.length === 0) technicalTopics = [`Review the fundamentals most relevant to ${role}.`];
-    const behavioralQuestions = [
-      'Describe a challenging problem you solved and how you approached it.',
-      'Tell me about a time you received difficult feedback and what you changed.',
-      `Why are you interested in ${role}?`,
-    ];
-    let projectTalkingPoints = context.resumeProjects
-      .filter((project) => typeof project === 'string' && project.trim())
-      .map((project) => `Explain the problem, your contribution, technical decisions, and truthful outcome for: ${project}.`);
-    if (projectTalkingPoints.length === 0) {
-      projectTalkingPoints = ['Prepare one concise project walkthrough covering the problem, your contribution, technical decisions, and outcome.'];
+    const role = context.latestJobTitle ?? context.careerGoal ?? context.resumeTargetRole;
+    const skills = distinct([...context.latestJobRequiredSkills, ...mergedSkills(context)]);
+    const questions = [];
+    const addQuestion = (category, question, rationale) => questions.push({ category, question, rationale });
+
+    for (const skill of skills.slice(0, 5)) {
+      const source = context.latestJobRequiredSkills.some((item) => normalize(item) === normalize(skill))
+        ? 'latest Job Intelligence requirements'
+        : 'skills recorded in your profile or resume analysis';
+      addQuestion(
+        'TECHNICAL',
+        `Explain the core concepts of ${skill} and how you would apply them${role ? ` in a ${role} role` : ''}.`,
+        `Based on ${skill} listed in your ${source}.`,
+      );
     }
-    return { technicalTopics, behavioralQuestions, projectTalkingPoints };
+
+    if (role && context.latestJobRequiredSkills.length > 0) {
+      addQuestion(
+        'ROLE_SPECIFIC',
+        `How would you prioritize the required skills for the ${role} role, and what would you clarify before starting the work?`,
+        `Based on the target role and requirements saved in your latest Job Intelligence analysis.`,
+      );
+    }
+
+    for (const experience of context.resumeExperience.slice(0, 2)) {
+      addQuestion(
+        'RESUME_BASED',
+        `Your resume analysis lists “${experience}”. What was your specific contribution, and what did you learn?`,
+        'References an experience entry detected in your saved resume analysis.',
+      );
+    }
+    for (const education of context.resumeEducation.slice(0, 2)) {
+      addQuestion(
+        'RESUME_BASED',
+        `Your resume analysis lists “${education}”. How has this education prepared you for the work you want to do?`,
+        'References an education entry detected in your saved resume analysis.',
+      );
+    }
+
+    for (const project of context.resumeProjects.slice(0, 3)) {
+      addQuestion(
+        'PROJECT_BASED',
+        `Your resume analysis lists “${project}”. Explain the problem, your contribution, a technical decision, and the outcome you can verify.`,
+        'References a project detected in your saved resume analysis.',
+      );
+    }
+
+    addQuestion(
+      'BEHAVIORAL',
+      'Describe a real challenge you faced, the steps you took, and what you learned. Use an example that reflects your actual experience.',
+      'General practice prompt; choose an example that is true for you.',
+    );
+    addQuestion(
+      'SITUATIONAL',
+      `How would you approach an unfamiliar task${role ? ` in a ${role} role` : ''} when the requirements are unclear?`,
+      'General situational practice prompt; no personal experience is assumed.',
+    );
+    addQuestion(
+      'HR',
+      role
+        ? `What interests you about pursuing a ${role} role?`
+        : 'What kind of role and working environment are you looking for?',
+      role
+        ? 'Uses your saved target role.'
+        : 'General HR practice prompt; no target role is saved yet.',
+    );
+
+    return {
+      technicalTopics: skills.slice(0, 8),
+      behavioralQuestions: questions.filter((item) => item.category === 'BEHAVIORAL').map((item) => item.question),
+      projectTalkingPoints: context.resumeProjects.slice(0, 3).map((project) => (
+        `Prepare to explain your contribution and verifiable outcome for: ${project}.`
+      )),
+      questions,
+    };
   }
 }

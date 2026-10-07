@@ -69,5 +69,12 @@ export function createCareerAssistantController({ service = createCareerAssistan
         return next(error);
       }
     },
+    async interviewAnswerFeedback(request, response, next) {
+      try {
+        return response.status(200).json(await service.evaluateInterviewAnswer(request.user, request.body));
+      } catch (error) {
+        return next(error);
+      }
+    },
   };
 }

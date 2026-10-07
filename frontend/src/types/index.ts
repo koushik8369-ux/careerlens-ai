@@ -289,9 +289,74 @@ export interface ProjectRecommendationResult {
 }
 
 export interface InterviewPreparationResult {
+  targetRole: string | null;
   technicalTopics: string[];
   behavioralQuestions: string[];
   projectTalkingPoints: string[];
+  questions: InterviewPreparationQuestion[];
+  contextAvailability: {
+    targetRole: boolean;
+    resumeAnalysis: boolean;
+    projects: boolean;
+    experience: boolean;
+    jobFit: boolean;
+    jobDescription: boolean;
+    careerPlan: boolean;
+  };
+  contextNotice: string | null;
+  readiness: {
+    status: InterviewReadinessStatus;
+    dimensions: Array<{
+      name: string;
+      status: InterviewReadinessStatus;
+      evidence: string;
+    }>;
+  };
+  recommendedPracticeAreas: string[];
+}
+
+export type InterviewPreparationCategory =
+  | 'TECHNICAL'
+  | 'BEHAVIORAL'
+  | 'RESUME_BASED'
+  | 'PROJECT_BASED'
+  | 'ROLE_SPECIFIC'
+  | 'SITUATIONAL'
+  | 'HR';
+
+export type InterviewReadinessStatus = 'STRONG' | 'NEEDS_PRACTICE' | 'NOT_ENOUGH_DATA';
+
+export interface InterviewPreparationQuestion {
+  id: string;
+  category: InterviewPreparationCategory;
+  question: string;
+  rationale: string;
+}
+
+export interface InterviewAnswerFeedbackRequest {
+  question: string;
+  category: InterviewPreparationCategory;
+  answer: string;
+}
+
+export interface InterviewAnswerFeedback {
+  topicCoverage: {
+    status: 'SOME_TERMS_PRESENT' | 'NO_SHARED_TERMS_DETECTED';
+    note: string;
+    matchedTerms: string[];
+  };
+  clarity: {
+    status: 'DETAILED' | 'BRIEF';
+    wordCount: number;
+    sentenceCount: number;
+  };
+  structure: {
+    suggestedFormat: 'STAR' | 'POINT_EXAMPLE_OUTCOME';
+    detectedStarElements: string[];
+  };
+  strengths: string[];
+  improvements: string[];
+  technicalValidation: string;
 }
 
 export interface CareerActionPlanResult {

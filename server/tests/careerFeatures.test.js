@@ -59,7 +59,7 @@ function createCareerModels() {
       detectedSkills: ['Java', 'Spring Boot'],
       detectedEducation: ['Computer Science'],
       detectedExperience: ['Built APIs'],
-      detectedProjects: ['CareerLens project'],
+      detectedProjects: ['Inventory tracking API'],
       missingSections: ['Certifications'],
       improvementSuggestions: ['Add measurable impact'],
       targetRole: 'Backend Engineer',
@@ -85,6 +85,7 @@ function createCareerModels() {
       createdAt: new Date('2025-02-01T00:00:00.000Z'),
       jobTitle: 'Backend Engineer',
       companyName: 'Example Company',
+      rawJobDescription: 'Backend Engineer role requiring Java and Docker to build REST services.',
       overallMatchScore: 78,
       requiredSkills: ['Java', 'Docker'],
       preferredSkills: ['Kubernetes'],
@@ -251,6 +252,11 @@ describe('Career Assistant and Plan APIs', () => {
       request(app).post('/api/career-assistant/roadmap'),
       request(app).post('/api/career-assistant/projects'),
       request(app).post('/api/career-assistant/interview-preparation'),
+      request(app).post('/api/career-assistant/interview-preparation/feedback').send({
+        question: 'Explain Java.',
+        category: 'TECHNICAL',
+        answer: 'Java is a programming language.',
+      }),
       request(app).post('/api/career-plans'),
       request(app).get('/api/career-plans/current'),
       request(app).get(`/api/career-plans/${'1'.repeat(24)}`),
@@ -446,6 +452,141 @@ describe('Career Assistant and Plan APIs', () => {
     assert.ok(interview.body.technicalTopics.length);
     assert.ok(interview.body.behavioralQuestions.length);
     assert.ok(interview.body.projectTalkingPoints.length);
+    assert.equal(interview.body.targetRole, 'Backend Engineer');
+    assert.equal(interview.body.contextAvailability.jobDescription, true);
+    assert.ok(interview.body.questions.some((item) => item.category === 'TECHNICAL' && /Docker/.test(item.question)));
+    assert.ok(interview.body.questions.some((item) => item.category === 'PROJECT_BASED' && /Inventory tracking API/.test(item.question)));
+    assert.ok(interview.body.questions.some((item) => item.category === 'ROLE_SPECIFIC'));
+    assert.equal(interview.body.readiness.status, 'NEEDS_PRACTICE');
+    assert.ok(interview.body.recommendedPracticeAreas.some((item) => /Docker|Kubernetes/.test(item)));
+  });
+
+  it('limits interview questions and practice recommendations to the authenticated user data', async () => {
+    models.resumeModel.records.push({
+      _id: '3'.repeat(24),
+      user: OTHER_ID,
+      createdAt: new Date('2025-03-01T00:00:00.000Z'),
+      detectedSkills: ['Ruby'],
+      detectedProjects: ['Foreign private project'],
+      detectedExperience: ['Foreign private work history'],
+    });
+    models.jobModel.records.push({
+      _id: '4'.repeat(24),
+      user: OTHER_ID,
+      createdAt: new Date('2025-03-01T00:00:00.000Z'),
+      jobTitle: 'Designer',
+      rawJobDescription: 'Foreign private job description.',
+      requiredSkills: ['Design'],
+    });
+    models.planModel.records.push({
+      user: OTHER_ID,
+      status: 'ACTIVE',
+      updatedAt: new Date('2025-03-01T00:00:00.000Z'),
+      items: [{ itemType: 'INTERVIEW', title: 'Foreign private interview plan', completed: false }],
+    });
+
+    const response = await request(app)
+      .post('/api/career-assistant/interview-preparation')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const body = JSON.stringify(response.body);
+
+    assert.equal(response.status, 200);
+    assert.doesNotMatch(body, /Ruby|Foreign private|Designer|Foreign private job/);
+    assert.match(body, /Inventory tracking API/);
+    assert.match(body, /Backend Engineer/);
+  });
+
+  it('provides generic-only interview questions and an explicit context notice when saved data is missing', async () => {
+    models.userModel.records.get(OWNER_ID).profile.careerGoal = null;
+    models.userModel.records.get(OWNER_ID).profile.skills = [];
+    models.resumeModel.records.length = 0;
+    models.jobModel.records.length = 0;
+
+    const response = await request(app)
+      .post('/api/career-assistant/interview-preparation')
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.targetRole, null);
+    assert.equal(response.body.technicalTopics.length, 0);
+    assert.equal(response.body.projectTalkingPoints.length, 0);
+    assert.ok(response.body.contextNotice);
+    assert.deepEqual(new Set(response.body.questions.map((item) => item.category)), new Set(['BEHAVIORAL', 'SITUATIONAL', 'HR']));
+    assert.equal(response.body.readiness.status, 'NOT_ENOUGH_DATA');
+  });
+
+  it('connects interview practice recommendations to the owner’s active Career Plan', async () => {
+    models.planModel.records.push({
+      user: OWNER_ID,
+      status: 'ACTIVE',
+      updatedAt: new Date('2025-03-02T00:00:00.000Z'),
+      careerGoal: 'Backend Engineer',
+      items: [
+        { itemType: 'INTERVIEW', title: 'Practice Java interview questions', completed: false },
+        { itemType: 'PROJECT', title: 'Build a Spring Boot REST API', completed: false },
+      ],
+    });
+    const response = await request(app)
+      .post('/api/career-assistant/interview-preparation')
+      .set('Authorization', `Bearer ${ownerToken}`);
+    const recommendations = response.body.recommendedPracticeAreas.join(' ');
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.contextAvailability.careerPlan, true);
+    assert.match(recommendations, /Practice Java interview questions/);
+    assert.match(recommendations, /planned project.*not evidence/i);
+  });
+
+  it('returns transparent answer-structure feedback and rejects invalid feedback requests', async () => {
+    const feedback = await request(app)
+      .post('/api/career-assistant/interview-preparation/feedback')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        question: 'Explain how Spring Boot dependency injection supports backend design.',
+        category: 'TECHNICAL',
+        answer: 'Spring Boot dependency injection lets an application provide its required objects instead of constructing every dependency directly. I would explain the container, describe how the dependencies are wired, mention a testing benefit, and give a verified example from my own work.',
+      });
+    const invalid = await request(app)
+      .post('/api/career-assistant/interview-preparation/feedback')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ question: 'Explain this.', category: 'UNKNOWN', answer: 'My answer.' });
+    const blank = await request(app)
+      .post('/api/career-assistant/interview-preparation/feedback')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ question: 'Explain this.', category: 'TECHNICAL', answer: ' ' });
+    const invalidBody = await request(app)
+      .post('/api/career-assistant/interview-preparation/feedback')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send(null);
+
+    assert.equal(feedback.status, 200);
+    assert.ok(feedback.body.strengths.length > 0);
+    assert.equal(feedback.body.clarity.status, 'DETAILED');
+    assert.match(feedback.body.technicalValidation, /not independently verified/i);
+    safeError(invalid, 400);
+    safeError(blank, 400);
+    safeError(invalidBody, 400);
+  });
+
+  it('surfaces interview provider failures safely through the existing Career Assistant route', async () => {
+    const failingProvider = {
+      prepareForInterview: async () => {
+        throw new Error('safe provider failure', { cause: 'AI_PROVIDER_FAILED' });
+      },
+    };
+    const dependencies = {
+      ...models,
+      aiProvider: failingProvider,
+      authenticateToken: (token) => extractAuthentication(token, testEnvironment),
+      userModel: models.userModel,
+    };
+    const failingApp = createApp({ authDependencies: dependencies, careerDependencies: dependencies });
+    const response = await request(failingApp)
+      .post('/api/career-assistant/interview-preparation')
+      .set('Authorization', `Bearer ${ownerToken}`);
+
+    safeError(response, 503);
+    assert.doesNotMatch(JSON.stringify(response.body), /AI_PROVIDER_FAILED|api.?key/i);
   });
 
   it('generates career plans with embedded ordered items and latest source references', async () => {
@@ -646,7 +787,15 @@ describe('AI provider selection and OpenAI-compatible mapping', () => {
       { weakAreas: ['Metrics'], missingContent: ['Add truthful metrics'], strongerWordingSuggestions: ['Quantify outcomes'] },
       { stages: [{ name: 'SHORT_TERM', objective: 'Learn a skill.', actions: ['Practice Docker'], skills: ['Docker'] }] },
       { recommendations: [{ title: 'Docker demo', description: 'Build a demo.', skills: ['Docker'], rationale: 'Shows applied skill.' }] },
-      { technicalTopics: ['Docker'], behavioralQuestions: ['Describe a challenge.'], projectTalkingPoints: ['Explain a project.'] },
+      {
+        technicalTopics: ['Docker'],
+        behavioralQuestions: ['Describe a challenge.'],
+        projectTalkingPoints: ['Explain a project.'],
+        questions: [
+          { category: 'TECHNICAL', question: 'Explain Docker concepts.', rationale: 'Use saved context.' },
+          { category: 'PROJECT_BASED', question: 'Walk through the saved demo project.', rationale: 'Use saved context.' },
+        ],
+      },
     ];
     let index = 0;
     let requestCount = 0;

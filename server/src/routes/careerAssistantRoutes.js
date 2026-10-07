@@ -19,5 +19,6 @@ export function createCareerAssistantRoutes(dependencies = {}) {
   router.post('/roadmap', controller.roadmap);
   router.post('/projects', controller.projects);
   router.post('/interview-preparation', controller.interviewPreparation);
+  router.post('/interview-preparation/feedback', controller.interviewAnswerFeedback);
   return router;
 }

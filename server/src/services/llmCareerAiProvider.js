@@ -47,6 +47,7 @@ function contextPrompt(context) {
     resumeJobFitMissingSkills: context.resumeJobFitMissingSkills,
     latestJobTitle: context.latestJobTitle,
     latestJobCompany: context.latestJobCompany,
+    latestJobDescription: context.latestJobDescription,
     latestJobOverallScore: context.latestJobOverallScore,
     latestJobRequiredSkills: context.latestJobRequiredSkills,
     latestJobPreferredSkills: context.latestJobPreferredSkills,
@@ -124,11 +125,28 @@ export class LlmCareerAiProvider {
   }
 
   async prepareForInterview(context) {
-    const result = await this.contextTask(context, 'Prepare technical topics, behavioral questions, and project talking points.', '{"technicalTopics":["string"],"behavioralQuestions":["string"],"projectTalkingPoints":["string"]}');
+    const result = await this.contextTask(
+      context,
+      'Create role-adaptive interview questions using only the supplied saved profile, resume analysis, job analysis and career plan. Never claim the candidate has a project or experience unless it is explicitly listed. For PROJECT_BASED and RESUME_BASED questions, include the exact project or resume evidence in the question. If context is missing, provide generic behavioral, situational or HR questions only. Include technicalTopics only from recorded skills or job requirements. Include projectTalkingPoints only for projects listed in resumeProjects.',
+      '{"technicalTopics":["string"],"behavioralQuestions":["string"],"projectTalkingPoints":["string"],"questions":[{"category":"TECHNICAL|BEHAVIORAL|RESUME_BASED|PROJECT_BASED|ROLE_SPECIFIC|SITUATIONAL|HR","question":"string","rationale":"string"}]}',
+    );
+    if (!Array.isArray(result.questions)
+        || result.questions.some((item) => (
+          typeof item?.question !== 'string'
+          || typeof item?.rationale !== 'string'
+          || !['TECHNICAL', 'BEHAVIORAL', 'RESUME_BASED', 'PROJECT_BASED', 'ROLE_SPECIFIC', 'SITUATIONAL', 'HR'].includes(item.category)
+        ))) {
+      throw this.invalidResponse();
+    }
     return {
       technicalTopics: this.requiredStringList(result, 'technicalTopics'),
       behavioralQuestions: this.requiredStringList(result, 'behavioralQuestions'),
       projectTalkingPoints: this.requiredStringList(result, 'projectTalkingPoints'),
+      questions: result.questions.map((item) => ({
+        category: item.category,
+        question: item.question.trim(),
+        rationale: item.rationale.trim(),
+      })),
     };
   }
 

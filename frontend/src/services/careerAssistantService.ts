@@ -7,6 +7,8 @@ import type {
   CareerRoadmapResult,
   CareerPlan,
   CareerPlanItemUpdateRequest,
+  InterviewAnswerFeedback,
+  InterviewAnswerFeedbackRequest,
   InterviewPreparationResult,
   ProjectRecommendationResult,
   ResumeImprovementResult,
@@ -56,6 +58,16 @@ export const generateProjectRecommendations = async (): Promise<ProjectRecommend
 
 export const prepareForInterview = async (): Promise<InterviewPreparationResult> => {
   const response = await api.post<InterviewPreparationResult>('/career-assistant/interview-preparation');
+  return response.data;
+};
+
+export const getInterviewAnswerFeedback = async (
+  request: InterviewAnswerFeedbackRequest,
+): Promise<InterviewAnswerFeedback> => {
+  const response = await api.post<InterviewAnswerFeedback>(
+    '/career-assistant/interview-preparation/feedback',
+    request,
+  );
   return response.data;
 };
 
